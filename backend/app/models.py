@@ -25,6 +25,15 @@ class InstanceStatus(str, enum.Enum):
     paused = "paused"  # streamer is live
 
 
+class InviteStatus(str, enum.Enum):
+    pending = "pending"
+    accepted = "accepted"
+    revoked = "revoked"
+
+
+import secrets
+
+
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
@@ -35,6 +44,10 @@ def _utcnow() -> datetime:
 
 def _uuid() -> str:
     return str(uuid.uuid4())
+
+
+def _invite_code() -> str:
+    return secrets.token_urlsafe(16)
 
 
 # ──────────────────────────────────────────────
@@ -68,6 +81,7 @@ class Team(Base):
     # Relationships
     members: Mapped[list["TeamMember"]] = relationship(back_populates="team", cascade="all, delete-orphan")
     instances: Mapped[list["OSRInstance"]] = relationship(back_populates="team", cascade="all, delete-orphan")
+    invites: Mapped[list["TeamInvite"]] = relationship(back_populates="team", cascade="all, delete-orphan")
 
 
 class TeamMember(Base):
@@ -84,6 +98,27 @@ class TeamMember(Base):
     # Relationships
     user: Mapped["User"] = relationship(back_populates="memberships")
     team: Mapped["Team"] = relationship(back_populates="members")
+
+
+class TeamInvite(Base):
+    """An invite link that grants access to a team with a specific role."""
+
+    __tablename__ = "team_invites"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    team_id: Mapped[str] = mapped_column(String(36), ForeignKey("teams.id", ondelete="CASCADE"))
+    invited_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"))
+    code: Mapped[str] = mapped_column(String(32), unique=True, index=True, default=_invite_code)
+    role: Mapped[TeamRole] = mapped_column(SAEnum(TeamRole), default=TeamRole.viewer)
+    status: Mapped[InviteStatus] = mapped_column(SAEnum(InviteStatus), default=InviteStatus.pending)
+    max_uses: Mapped[int] = mapped_column(Integer, default=0)  # 0 = unlimited
+    use_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    team: Mapped["Team"] = relationship(back_populates="invites")
+    creator: Mapped["User"] = relationship()
 
 
 class OSRInstance(Base):

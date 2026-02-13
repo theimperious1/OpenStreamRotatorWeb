@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # Frontend
     frontend_url: str = "http://localhost:3000"
 
+    # CORS — comma-separated origins, or "*" for all
+    allowed_origins: str = ""
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

@@ -2,11 +2,24 @@
  * API client for the OpenStreamRotator backend.
  *
  * All functions read the JWT from localStorage and include it as a
- * Bearer token. The base URL defaults to http://localhost:8000 but
- * can be overridden via NEXT_PUBLIC_API_URL.
+ * Bearer token. The base URL is determined dynamically:
+ *   1. NEXT_PUBLIC_API_URL env var (if set)
+ *   2. Same hostname as the current page, port 8000
+ *   3. Fallback to http://localhost:8000 (SSR / tests)
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+function resolveApiBase(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+  return "http://localhost:8000";
+}
+
+/** Returns the API base URL, derived from the current page's hostname. */
+export function getApiBase(): string {
+  return resolveApiBase();
+}
 
 // ── Helpers ──────────────────────────────────
 
@@ -16,7 +29,7 @@ function authHeaders(): HeadersInit {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${getApiBase()}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -90,7 +103,7 @@ export interface TeamDetail extends Team {
 // ── Auth ─────────────────────────────────────
 
 export function getDiscordLoginUrl(): string {
-  return `${API_BASE}/auth/discord/login`;
+  return `${getApiBase()}/auth/discord/login`;
 }
 
 export async function getMe(): Promise<User> {
@@ -168,12 +181,76 @@ export async function deleteInstance(
   });
 }
 
+// ── Invite Links ─────────────────────────────
+
+export interface InviteLink {
+  id: string;
+  team_id: string;
+  team_name: string;
+  code: string;
+  role: TeamMember["role"];
+  status: "pending" | "accepted" | "revoked";
+  max_uses: number;
+  use_count: number;
+  created_at: string;
+  expires_at: string | null;
+  created_by: string;
+}
+
+export interface InviteInfo {
+  code: string;
+  team_name: string;
+  role: TeamMember["role"];
+  created_by: string;
+  expires_at: string | null;
+  is_valid: boolean;
+}
+
+export async function createInviteLink(
+  teamId: string,
+  role: TeamMember["role"] = "viewer",
+  maxUses: number = 0,
+  expiresInHours: number | null = null
+): Promise<InviteLink> {
+  return apiFetch<InviteLink>(`/teams/${teamId}/invites`, {
+    method: "POST",
+    body: JSON.stringify({
+      role,
+      max_uses: maxUses,
+      expires_in_hours: expiresInHours,
+    }),
+  });
+}
+
+export async function listInviteLinks(teamId: string): Promise<InviteLink[]> {
+  return apiFetch<InviteLink[]>(`/teams/${teamId}/invites`);
+}
+
+export async function revokeInviteLink(
+  teamId: string,
+  inviteId: string
+): Promise<void> {
+  return apiFetch<void>(`/teams/${teamId}/invites/${inviteId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getInviteInfo(code: string): Promise<InviteInfo> {
+  return apiFetch<InviteInfo>(`/invites/${code}`);
+}
+
+export async function acceptInvite(code: string): Promise<TeamMember> {
+  return apiFetch<TeamMember>(`/invites/${code}/accept`, {
+    method: "POST",
+  });
+}
+
 // ── WebSocket ────────────────────────────────
 
 export function connectDashboardWs(instanceId: string): WebSocket | null {
   const token = typeof window !== "undefined" ? localStorage.getItem("osr_token") : null;
   if (!token) return null;
 
-  const wsBase = API_BASE.replace(/^http/, "ws");
+  const wsBase = getApiBase().replace(/^http/, "ws");
   return new WebSocket(`${wsBase}/ws/dashboard/${instanceId}?token=${token}`);
 }

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from pydantic import BaseModel
-from app.models import TeamRole, InstanceStatus
+from app.models import TeamRole, InstanceStatus, InviteStatus
 
 
 # ──────────────────────────────────────────────
@@ -68,6 +68,42 @@ class RoleUpdate(BaseModel):
 class InviteCreate(BaseModel):
     discord_id: str
     role: TeamRole = TeamRole.viewer
+
+
+# ──────────────────────────────────────────────
+# Invite links
+# ──────────────────────────────────────────────
+
+class InviteLinkCreate(BaseModel):
+    role: TeamRole = TeamRole.viewer
+    max_uses: int = 0  # 0 = unlimited
+    expires_in_hours: int | None = None  # None = never expires
+
+
+class InviteLinkOut(BaseModel):
+    id: str
+    team_id: str
+    team_name: str
+    code: str
+    role: TeamRole
+    status: InviteStatus
+    max_uses: int
+    use_count: int
+    created_at: datetime
+    expires_at: datetime | None
+    created_by: str  # discord username
+
+    model_config = {"from_attributes": True}
+
+
+class InviteInfoOut(BaseModel):
+    """Public info shown on the accept page (no sensitive data)."""
+    code: str
+    team_name: str
+    role: TeamRole
+    created_by: str
+    expires_at: datetime | None
+    is_valid: bool
 
 
 # ──────────────────────────────────────────────

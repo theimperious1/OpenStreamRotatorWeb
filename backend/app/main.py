@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.api.auth_routes import router as auth_router
 from app.api.team_routes import router as team_router
+from app.api.invite_routes import router as invite_router
 from app.api.ws_routes import router as ws_router
 
 
@@ -26,11 +27,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow frontend origin
+# CORS — allow frontend origin(s)
 settings = get_settings()
+_origins: list[str] = []
+if settings.allowed_origins:
+    _origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
+else:
+    # Default: allow frontend_url + common local variants
+    _origins = [settings.frontend_url]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=_origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,9 +48,15 @@ app.add_middleware(
 # Routes
 app.include_router(auth_router)
 app.include_router(team_router)
+app.include_router(invite_router)
 app.include_router(ws_router)
 
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

@@ -14,18 +14,19 @@ export default function AuthCallbackPage() {
 
   // Derive error state from search params (no setState in effect)
   const token = searchParams.get("token");
+  const redirectPath = searchParams.get("redirect");
   const hasError = !token;
 
   useEffect(() => {
     if (processed.current || !token) return;
     processed.current = true;
 
-    // Store token and redirect to dashboard
+    // Store token and redirect to target (or dashboard)
     localStorage.setItem("osr_token", token);
     refresh().then(() => {
-      router.replace("/dashboard");
+      router.replace(redirectPath || "/dashboard");
     });
-  }, [token, router, refresh]);
+  }, [token, router, refresh, redirectPath]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">

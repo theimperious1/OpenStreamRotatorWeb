@@ -1,9 +1,17 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Radio } from "lucide-react";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { getApiBase } from "@/lib/api";
 
 export default function HomePage() {
+  const [apiBase, setApiBase] = useState("");
+
+  useEffect(() => {
+    setApiBase(getApiBase());
+  }, []);
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
       <div className="mx-auto max-w-md text-center space-y-8">
@@ -21,7 +29,7 @@ export default function HomePage() {
 
         <div className="space-y-3">
           <Button asChild size="lg" className="w-full">
-            <a href={`${API_BASE}/auth/discord/login`}>
+            <a href={`${apiBase}/auth/discord/login`}>
               <svg
                 className="h-5 w-5 mr-2"
                 viewBox="0 0 24 24"

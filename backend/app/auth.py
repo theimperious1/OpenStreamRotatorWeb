@@ -7,6 +7,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
+import json
+import base64
 
 from app.config import get_settings
 from app.database import get_db
@@ -23,15 +25,28 @@ DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token"
 # Discord OAuth
 # ──────────────────────────────────────────────
 
-def get_discord_login_url() -> str:
-    """Build the Discord OAuth2 authorization URL."""
+def get_discord_login_url(frontend_origin: str | None = None, redirect_path: str | None = None) -> str:
+    """Build the Discord OAuth2 authorization URL.
+    
+    Encodes the frontend_origin and optional redirect_path into the OAuth
+    state parameter so the callback knows where to send the user.
+    """
     settings = get_settings()
+    state_data = {}
+    if frontend_origin:
+        state_data["origin"] = frontend_origin
+    if redirect_path:
+        state_data["redirect"] = redirect_path
+    state = base64.urlsafe_b64encode(json.dumps(state_data).encode()).decode() if state_data else ""
+    
     params = {
         "client_id": settings.discord_client_id,
         "redirect_uri": settings.discord_redirect_uri,
         "response_type": "code",
         "scope": "identify",
     }
+    if state:
+        params["state"] = state
     query = "&".join(f"{k}={v}" for k, v in params.items())
     return f"{DISCORD_OAUTH_URL}?{query}"
 

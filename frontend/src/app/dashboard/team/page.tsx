@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -22,7 +22,11 @@ import {
   removeMember,
   createInstance,
   deleteInstance,
+  createInviteLink,
+  listInviteLinks,
+  revokeInviteLink,
   type TeamMember,
+  type InviteLink,
 } from "@/lib/api";
 import {
   UserPlus,
@@ -37,7 +41,18 @@ import {
   Copy,
   Check,
   Trash2,
+  Link,
+  Clock,
+  Ban,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -86,9 +101,43 @@ export default function TeamPage() {
   const [creatingInstance, setCreatingInstance] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  // Invite link state
+  const [inviteLinks, setInviteLinks] = useState<InviteLink[]>([]);
+  const [loadingInvites, setLoadingInvites] = useState(false);
+  const [creatingLink, setCreatingLink] = useState(false);
+  const [linkRole, setLinkRole] = useState<TeamMember["role"]>("viewer");
+  const [linkExpiry, setLinkExpiry] = useState<string>("never");
+  const [linkMaxUses, setLinkMaxUses] = useState<string>("0");
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
+
+  // Clipboard helper — falls back to execCommand for plain HTTP
+  function copyToClipboard(text: string): void {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+  }
+
   const members = activeTeam?.members ?? [];
   const myRole = members.find((m) => m.user_id === user?.id)?.role;
   const isOwner = myRole === "owner";
+  const canManageInvites = isOwner || myRole === "content_manager";
+
+  // Auto-fetch invite links when team loads
+  useEffect(() => {
+    if (activeTeam && canManageInvites) {
+      fetchInviteLinks();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTeam?.id]);
 
   async function handleCreateTeam() {
     if (!teamName.trim()) return;
@@ -112,6 +161,56 @@ export default function TeamPage() {
     } finally {
       setInviting(false);
     }
+  }
+
+  async function fetchInviteLinks() {
+    if (!activeTeam) return;
+    setLoadingInvites(true);
+    try {
+      const links = await listInviteLinks(activeTeam.id);
+      setInviteLinks(links);
+    } finally {
+      setLoadingInvites(false);
+    }
+  }
+
+  async function handleCreateLink() {
+    if (!activeTeam) return;
+    setCreatingLink(true);
+    try {
+      const expiryHours = linkExpiry === "never" ? null : parseInt(linkExpiry, 10);
+      const maxUses = parseInt(linkMaxUses, 10) || 0;
+      const link = await createInviteLink(activeTeam.id, linkRole, maxUses, expiryHours);
+      setInviteLinks((prev) => [link, ...prev]);
+      const url = `${window.location.origin}/invite/${link.code}`;
+      copyToClipboard(url);
+      toast.success("Invite link created and copied to clipboard!");
+    } catch {
+      toast.error("Failed to create invite link");
+    } finally {
+      setCreatingLink(false);
+    }
+  }
+
+  async function handleRevokeLink(inviteId: string) {
+    if (!activeTeam) return;
+    try {
+      await revokeInviteLink(activeTeam.id, inviteId);
+      setInviteLinks((prev) =>
+        prev.map((l) => (l.id === inviteId ? { ...l, status: "revoked" as const } : l))
+      );
+      toast.success("Invite revoked");
+    } catch {
+      toast.error("Failed to revoke invite");
+    }
+  }
+
+  function handleCopyLink(code: string) {
+    const url = `${window.location.origin}/invite/${code}`;
+    copyToClipboard(url);
+    setCopiedLink(code);
+    toast.success("Invite link copied!");
+    setTimeout(() => setCopiedLink(null), 2000);
   }
 
   async function handleRoleChange(memberId: string, role: TeamMember["role"]) {
@@ -145,7 +244,7 @@ export default function TeamPage() {
   }
 
   function handleCopyKey(apiKey: string) {
-    navigator.clipboard.writeText(apiKey);
+    copyToClipboard(apiKey);
     setCopiedKey(apiKey);
     setTimeout(() => setCopiedKey(null), 2000);
   }
@@ -198,19 +297,6 @@ export default function TeamPage() {
           <p className="text-muted-foreground">
             Manage team members and permissions
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Discord ID to invite"
-            value={inviteDiscordId}
-            onChange={(e) => setInviteDiscordId(e.target.value)}
-            className="w-48"
-            onKeyDown={(e) => e.key === "Enter" && handleInvite()}
-          />
-          <Button onClick={handleInvite} disabled={inviting || !inviteDiscordId.trim()}>
-            {inviting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
-            Invite
-          </Button>
         </div>
       </div>
 
@@ -334,6 +420,192 @@ export default function TeamPage() {
 
       <Separator />
 
+      {/* Invite Links */}
+      {(isOwner || myRole === "content_manager") && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Invite Links</CardTitle>
+                <CardDescription>
+                  Create shareable links to invite people to your team
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchInviteLinks}
+                disabled={loadingInvites}
+              >
+                {loadingInvites ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Refresh"
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Create new link */}
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Role</label>
+                <Select value={linkRole} onValueChange={(v) => setLinkRole(v as TeamMember["role"])}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="viewer">Viewer</SelectItem>
+                    <SelectItem value="moderator">Moderator</SelectItem>
+                    <SelectItem value="content_manager">Content Manager</SelectItem>
+                    {isOwner && <SelectItem value="owner">Owner</SelectItem>}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Expires</label>
+                <Select value={linkExpiry} onValueChange={setLinkExpiry}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="never">Never</SelectItem>
+                    <SelectItem value="1">1 hour</SelectItem>
+                    <SelectItem value="24">24 hours</SelectItem>
+                    <SelectItem value="168">7 days</SelectItem>
+                    <SelectItem value="720">30 days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Max uses</label>
+                <Select value={linkMaxUses} onValueChange={setLinkMaxUses}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Unlimited</SelectItem>
+                    <SelectItem value="1">1 use</SelectItem>
+                    <SelectItem value="5">5 uses</SelectItem>
+                    <SelectItem value="10">10 uses</SelectItem>
+                    <SelectItem value="25">25 uses</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={handleCreateLink} disabled={creatingLink}>
+                {creatingLink ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Link className="h-4 w-4 mr-2" />
+                )}
+                Create Link
+              </Button>
+            </div>
+
+            {/* Existing links */}
+            {inviteLinks.length > 0 && (
+              <div className="space-y-2">
+                {inviteLinks.map((link) => {
+                  const isActive = link.status === "pending";
+                  const isExpired =
+                    link.expires_at && new Date(link.expires_at) < new Date();
+                  const isUsedUp =
+                    link.max_uses > 0 && link.use_count >= link.max_uses;
+                  const effectivelyActive = isActive && !isExpired && !isUsedUp;
+
+                  return (
+                    <div
+                      key={link.id}
+                      className={`flex items-center gap-3 rounded-md border px-4 py-3 ${
+                        effectivelyActive ? "" : "opacity-60"
+                      }`}
+                    >
+                      <Link className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono">
+                            {link.code}
+                          </code>
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] px-1.5 py-0 ${
+                              roleConfig[link.role]?.color ?? ""
+                            }`}
+                          >
+                            {roleConfig[link.role]?.label ?? link.role}
+                          </Badge>
+                          {!effectivelyActive && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] px-1.5 py-0 bg-red-500/10 text-red-500 border-red-500/20"
+                            >
+                              {link.status === "revoked"
+                                ? "Revoked"
+                                : isExpired
+                                ? "Expired"
+                                : isUsedUp
+                                ? "Used up"
+                                : link.status}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          <span>
+                            {link.use_count}
+                            {link.max_uses > 0 ? `/${link.max_uses}` : ""} uses
+                          </span>
+                          {link.expires_at && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(link.expires_at).toLocaleDateString()}
+                            </span>
+                          )}
+                          <span>by {link.created_by}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {effectivelyActive && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleCopyLink(link.code)}
+                          >
+                            {copiedLink === link.code ? (
+                              <Check className="h-3.5 w-3.5 text-green-500" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        )}
+                        {effectivelyActive && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => handleRevokeLink(link.id)}
+                          >
+                            <Ban className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {inviteLinks.length === 0 && !loadingInvites && (
+              <p className="text-sm text-muted-foreground">
+                No invite links yet. Create one above to share with your team.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Separator />
+
       {/* Members List */}
       <Card>
         <CardHeader>
@@ -342,7 +614,32 @@ export default function TeamPage() {
             {members.length} team member{members.length !== 1 ? "s" : ""}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* Direct add by Discord ID (owner only) */}
+          {isOwner && (
+            <div className="flex items-center gap-3">
+              <Input
+                placeholder="Add by Discord ID"
+                value={inviteDiscordId}
+                onChange={(e) => setInviteDiscordId(e.target.value)}
+                className="max-w-xs"
+                onKeyDown={(e) => e.key === "Enter" && handleInvite()}
+              />
+              <Button
+                variant="outline"
+                onClick={handleInvite}
+                disabled={inviting || !inviteDiscordId.trim()}
+              >
+                {inviting ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <UserPlus className="h-4 w-4 mr-2" />
+                )}
+                Add
+              </Button>
+            </div>
+          )}
+
           <div className="space-y-3">
             {members.map((member) => {
               const role = roleConfig[member.role];
