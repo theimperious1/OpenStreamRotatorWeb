@@ -1,0 +1,26 @@
+# Backend
+backend/osr_web.db
+backend/.env
+backend/__pycache__/
+backend/*.pyc
+
+# Frontend
+frontend/node_modules/
+frontend/package-lock.json
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
