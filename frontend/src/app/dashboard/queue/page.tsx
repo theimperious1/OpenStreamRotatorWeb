@@ -78,6 +78,8 @@ export default function QueuePage() {
   })();
   const queue = state?.queue ?? [];
   const downloadActive = state?.download_active ?? false;
+  const canSkip = state?.can_skip ?? true;
+  const canTriggerRotation = state?.can_trigger_rotation ?? true;
 
   // Find the index of the currently playing video in the queue
   const currentIndex = currentVideo
@@ -131,13 +133,13 @@ export default function QueuePage() {
             label="Skip Current"
             icon={SkipForward}
             onClick={() => sendCommand("skip_video")}
-            disabled={!instance || !connected}
+            disabled={!instance || !connected || !canSkip}
           />
           <CommandButton
             label="Trigger Rotation"
             icon={RefreshCw}
             onClick={() => sendCommand("trigger_rotation")}
-            disabled={!instance || !connected}
+            disabled={!instance || !connected || !canTriggerRotation}
           />
         </div>
       </div>
@@ -168,7 +170,7 @@ export default function QueuePage() {
                 label="Skip"
                 icon={SkipForward}
                 onClick={() => sendCommand("skip_video")}
-                disabled={!instance || !connected}
+                disabled={!instance || !connected || !canSkip}
               />
             </div>
           </CardContent>

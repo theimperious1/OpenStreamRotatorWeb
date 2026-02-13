@@ -443,6 +443,7 @@ export default function PlaylistsPage() {
   const playlists = state?.playlists ?? [];
   const settings = state?.settings;
   const currentPlaylist = state?.current_playlist ?? instance?.current_playlist;
+  const canTriggerRotation = state?.can_trigger_rotation ?? true;
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingName, setEditingName] = useState<string | null>(null);
@@ -522,7 +523,7 @@ export default function PlaylistsPage() {
             label="Trigger Rotation"
             icon={RefreshCw}
             onClick={() => sendCommand("trigger_rotation")}
-            disabled={!instance || !connected}
+            disabled={!instance || !connected || !canTriggerRotation}
           />
         </div>
       </div>

@@ -46,6 +46,16 @@ export interface Connections {
   kick_enabled: boolean;
 }
 
+export interface PreparedRotation {
+  folder: string;
+  title: string;
+  playlists: string[];
+  status: "created" | "downloading" | "ready" | "scheduled" | "executing" | "completed";
+  video_count: number;
+  created_at: string | null;
+  scheduled_at: string | null;
+}
+
 export interface InstanceState {
   status: "online" | "offline" | "paused";
   manual_pause: boolean;
@@ -59,6 +69,11 @@ export interface InstanceState {
   queue: string[];
   connections: Connections;
   download_active: boolean;
+  can_skip: boolean;
+  can_trigger_rotation: boolean;
+  prepared_rotations: PreparedRotation[];
+  any_downloading: boolean;
+  executing_folder: string | null;
 }
 
 export interface LogEntry {

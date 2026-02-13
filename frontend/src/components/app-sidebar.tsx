@@ -11,6 +11,7 @@ import {
   Settings,
   Radio,
   LogOut,
+  FolderClock,
 } from "lucide-react";
 import {
   Sidebar,
@@ -34,6 +35,7 @@ const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Playlists", href: "/dashboard/playlists", icon: ListMusic },
   { title: "Queue", href: "/dashboard/queue", icon: PlayCircle },
+  { title: "Prepared", href: "/dashboard/prepared", icon: FolderClock },
   { title: "Logs", href: "/dashboard/logs", icon: ScrollText },
   { title: "Team", href: "/dashboard/team", icon: Users },
   { title: "Settings", href: "/dashboard/settings", icon: Settings },
