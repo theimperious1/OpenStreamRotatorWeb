@@ -12,6 +12,8 @@ import {
 import { connectDashboardWs } from "@/lib/api";
 import { useTeam } from "@/lib/team-context";
 
+import { toast } from "sonner";
+
 // ── Types ────────────────────────────────────
 
 export interface PlaylistConfig {
@@ -123,6 +125,7 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
         console.log("[OSR-WS] Connected to", id);
         setConnected(true);
         reconnectDelay.current = RECONNECT_BASE_MS; // reset backoff
+        toast.success("Connected to OSR instance", { id: "ws-connect", duration: 2000 });
       };
 
       ws.onmessage = (event) => {
@@ -135,10 +138,18 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
             setLogs((prev) => [msg.data, ...prev].slice(0, 1000));
           } else if (msg.type === "command_ack") {
             const delivered = msg.data?.delivered ?? false;
-            console.log("[OSR-WS] Command ack:", { delivered, action: lastActionRef.current });
+            const action = lastActionRef.current.replace(/_/g, " ");
+            console.log("[OSR-WS] Command ack:", { delivered, action });
             setLastAck({ delivered, action: lastActionRef.current });
+            if (delivered) {
+              toast.success(`Command sent: ${action}`);
+            } else {
+              toast.error(`Command failed: ${action} — instance offline`);
+            }
           } else if (msg.type === "error") {
-            console.warn("[OSR-WS] Server error:", msg.data?.message);
+            const message = msg.data?.message ?? "Unknown error";
+            console.warn("[OSR-WS] Server error:", message);
+            toast.error(message);
           }
         } catch {
           // ignore malformed
@@ -155,6 +166,7 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
         if (e.code !== 4001 && e.code !== 4003 && e.code !== 4004) {
           const delay = reconnectDelay.current;
           console.log(`[OSR-WS] Reconnecting in ${delay}ms...`);
+          toast.loading("Reconnecting to OSR...", { id: "ws-connect" });
           reconnectTimer.current = setTimeout(() => {
             reconnectDelay.current = Math.min(delay * 2, RECONNECT_MAX_MS);
             connectRef.current(id);
