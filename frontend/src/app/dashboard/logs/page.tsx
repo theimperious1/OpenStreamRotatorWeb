@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useTeam } from "@/lib/team-context";
-import { useInstanceWs, type LogEntry } from "@/hooks/use-instance-ws";
+import { useInstanceWs, type LogEntry } from "@/lib/instance-ws-context";
 import { Search, Filter, Loader2 } from "lucide-react";
 
 const levelColors: Record<LogEntry["level"], string> = {
@@ -17,9 +17,8 @@ const levelColors: Record<LogEntry["level"], string> = {
 };
 
 export default function LogsPage() {
-  const { activeTeam, loading: teamLoading } = useTeam();
-  const instance = activeTeam?.instances?.[0] ?? null;
-  const { logs: wsLogs, connected } = useInstanceWs(instance?.id ?? null);
+  const { loading: teamLoading } = useTeam();
+  const { logs: wsLogs, connected } = useInstanceWs();
   const [filter, setFilter] = useState<LogEntry["level"] | "all">("all");
   const [search, setSearch] = useState("");
 

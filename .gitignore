@@ -1,8 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+
 # Backend
 backend/osr_web.db
 backend/.env
-backend/__pycache__/
-backend/*.pyc
 
 # Frontend
 frontend/node_modules/

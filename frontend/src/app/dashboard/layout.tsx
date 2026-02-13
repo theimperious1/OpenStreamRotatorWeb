@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "@/lib/auth-context";
 import { TeamProvider } from "@/lib/team-context";
+import { InstanceWsProvider } from "@/lib/instance-ws-context";
 import { Loader2 } from "lucide-react";
 
 export default function DashboardLayout({
@@ -30,15 +31,17 @@ export default function DashboardLayout({
 
   return (
     <TeamProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <main className="flex-1 overflow-auto">
-          <div className="flex items-center gap-2 border-b px-4 py-2">
-            <SidebarTrigger />
-          </div>
-          <div className="p-6">{children}</div>
-        </main>
-      </SidebarProvider>
+      <InstanceWsProvider>
+        <SidebarProvider>
+          <AppSidebar />
+          <main className="flex-1 overflow-auto">
+            <div className="flex items-center gap-2 border-b px-4 py-2">
+              <SidebarTrigger />
+            </div>
+            <div className="p-6">{children}</div>
+          </main>
+        </SidebarProvider>
+      </InstanceWsProvider>
     </TeamProvider>
   );
 }

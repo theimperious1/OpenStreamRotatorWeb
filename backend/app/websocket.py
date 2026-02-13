@@ -107,7 +107,7 @@ class ConnectionManager:
             instance.status = InstanceStatus(state.get("status", "online"))
             instance.current_video = state.get("current_video")
             instance.current_playlist = state.get("current_playlist")
-            instance.current_category = state.get("current_category")
+            instance.current_category = json.dumps(state["current_category"]) if isinstance(state.get("current_category"), dict) else state.get("current_category")
             instance.obs_connected = state.get("obs_connected", False)
             instance.uptime_seconds = state.get("uptime_seconds", 0)
             instance.last_seen = datetime.now(timezone.utc)

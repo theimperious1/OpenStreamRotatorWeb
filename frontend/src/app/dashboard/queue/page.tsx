@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTeam } from "@/lib/team-context";
-import { useInstanceWs } from "@/hooks/use-instance-ws";
+import { useInstanceWs } from "@/lib/instance-ws-context";
 import {
   PlayCircle,
   SkipForward,
@@ -66,11 +66,16 @@ function CommandButton({
 export default function QueuePage() {
   const { activeTeam, loading: teamLoading } = useTeam();
   const instance = activeTeam?.instances?.[0] ?? null;
-  const { state, sendCommand, connected, lastAck } = useInstanceWs(instance?.id ?? null);
+  const { state, sendCommand, connected, lastAck } = useInstanceWs();
 
   const currentVideo = state?.current_video ?? instance?.current_video;
   const currentPlaylist = state?.current_playlist ?? instance?.current_playlist;
-  const currentCategory = state?.current_category ?? instance?.current_category;
+  const currentCategory = (() => {
+    const raw = state?.current_category ?? instance?.current_category;
+    if (!raw) return null;
+    if (typeof raw === "string") return raw;
+    return raw.twitch || raw.kick || null;
+  })();
   const queue = state?.queue ?? [];
   const downloadActive = state?.download_active ?? false;
 

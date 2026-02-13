@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useTeam } from "@/lib/team-context";
-import { useInstanceWs, type LogEntry } from "@/hooks/use-instance-ws";
+import { useInstanceWs, type LogEntry } from "@/lib/instance-ws-context";
 import {
   Monitor,
   Clock,
@@ -67,14 +67,19 @@ function LogLevelBadge({ level }: { level: LogEntry["level"] }) {
 export default function DashboardPage() {
   const { activeTeam, loading: teamLoading } = useTeam();
   const instance = activeTeam?.instances?.[0] ?? null;
-  const { state, logs, connected } = useInstanceWs(instance?.id ?? null);
+  const { state, logs, connected } = useInstanceWs();
 
   // Merge WebSocket live state with the DB snapshot from the team detail
   const isOnline = state?.status === "online" || instance?.status === "online";
   const isPaused = state?.status === "paused" || instance?.status === "paused";
   const currentVideo = state?.current_video ?? instance?.current_video ?? "—";
   const currentPlaylist = state?.current_playlist ?? instance?.current_playlist ?? "—";
-  const currentCategory = state?.current_category ?? instance?.current_category ?? "—";
+  const currentCategory = (() => {
+    const raw = state?.current_category ?? instance?.current_category;
+    if (!raw) return "—";
+    if (typeof raw === "string") return raw;
+    return raw.twitch || raw.kick || "—";
+  })();
   const obsConnected = state?.obs_connected ?? instance?.obs_connected ?? false;
   const uptimeSeconds = state?.uptime_seconds ?? instance?.uptime_seconds ?? 0;
 

@@ -13,8 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useTeam } from "@/lib/team-context";
-import { useInstanceWs } from "@/hooks/use-instance-ws";
-import type { OsrSettings } from "@/hooks/use-instance-ws";
+import { useInstanceWs } from "@/lib/instance-ws-context";
+import type { OsrSettings } from "@/lib/instance-ws-context";
 import { Save, Loader2 } from "lucide-react";
 
 function SettingRow({
@@ -59,7 +59,7 @@ function ToggleButton({
 export default function SettingsPage() {
   const { activeTeam } = useTeam();
   const instance = activeTeam?.instances?.[0] ?? null;
-  const { state, sendCommand, connected, lastAck } = useInstanceWs(instance?.id ?? null);
+  const { state, sendCommand, connected, lastAck } = useInstanceWs();
 
   const remoteSettings = state?.settings;
   const connections = state?.connections;
