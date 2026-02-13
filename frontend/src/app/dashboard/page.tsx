@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useTeam } from "@/lib/team-context";
 import { useInstanceWs, type LogEntry } from "@/lib/instance-ws-context";
 import {
@@ -18,6 +19,8 @@ import {
   Wifi,
   WifiOff,
   Loader2,
+  Play,
+  Pause,
 } from "lucide-react";
 
 function formatUptime(seconds: number): string {
@@ -67,11 +70,12 @@ function LogLevelBadge({ level }: { level: LogEntry["level"] }) {
 export default function DashboardPage() {
   const { activeTeam, loading: teamLoading } = useTeam();
   const instance = activeTeam?.instances?.[0] ?? null;
-  const { state, logs, connected } = useInstanceWs();
+  const { state, logs, connected, sendCommand } = useInstanceWs();
 
   // Merge WebSocket live state with the DB snapshot from the team detail
   const isOnline = state?.status === "online" || instance?.status === "online";
   const isPaused = state?.status === "paused" || instance?.status === "paused";
+  const isManualPause = state?.manual_pause ?? false;
   const currentVideo = state?.current_video ?? instance?.current_video ?? "—";
   const currentPlaylist = state?.current_playlist ?? instance?.current_playlist ?? "—";
   const currentCategory = (() => {
@@ -142,7 +146,9 @@ export default function DashboardPage() {
             <div>
               <p className="font-semibold">
                 {isPaused
-                  ? "Stream Paused — Streamer is Live"
+                  ? isManualPause
+                    ? "Stream Paused — Manual"
+                    : "Stream Paused — Streamer is Live"
                   : isOnline
                   ? "Stream Online"
                   : "Stream Offline"}
@@ -154,11 +160,37 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
-          {connected && (
-            <Badge variant="outline" className="text-green-500 border-green-500/30 text-[10px]">
-              Live
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {connected && (isOnline || isPaused) && (
+              <Button
+                variant={isPaused && isManualPause ? "default" : "outline"}
+                size="sm"
+                className="gap-1.5"
+                onClick={() =>
+                  sendCommand(
+                    isPaused && isManualPause ? "resume_stream" : "pause_stream"
+                  )
+                }
+              >
+                {isPaused && isManualPause ? (
+                  <>
+                    <Play className="h-4 w-4" />
+                    Resume
+                  </>
+                ) : (
+                  <>
+                    <Pause className="h-4 w-4" />
+                    Pause
+                  </>
+                )}
+              </Button>
+            )}
+            {connected && (
+              <Badge variant="outline" className="text-green-500 border-green-500/30 text-[10px]">
+                Live
+              </Badge>
+            )}
+          </div>
         </CardContent>
       </Card>
 

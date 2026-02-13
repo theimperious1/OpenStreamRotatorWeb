@@ -48,6 +48,7 @@ export interface Connections {
 
 export interface InstanceState {
   status: "online" | "offline" | "paused";
+  manual_pause: boolean;
   current_video: string | null;
   current_playlist: string | null;
   current_category: { twitch: string; kick: string } | null;
