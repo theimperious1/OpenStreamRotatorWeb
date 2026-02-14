@@ -1,16 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Radio } from "lucide-react";
 import { getApiBase } from "@/lib/api";
 
 export default function HomePage() {
-  const [apiBase, setApiBase] = useState("");
-
-  useEffect(() => {
-    setApiBase(getApiBase());
-  }, []);
+  const apiBase = useMemo(() => getApiBase(), []);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
@@ -23,8 +19,9 @@ export default function HomePage() {
         </div>
 
         <p className="text-lg text-muted-foreground">
-          Automated 24/7 stream management. Content rotation, live detection,
-          multi-platform metadata, crash recovery — all unattended.
+          <b>Automated 24/7 stream management.</b><br></br>
+          <br></br>
+          Content rotation, live detection, multi-platform control, scheduled rotations, and a real-time web dashboard — all unattended.
         </p>
 
         <div className="space-y-3">

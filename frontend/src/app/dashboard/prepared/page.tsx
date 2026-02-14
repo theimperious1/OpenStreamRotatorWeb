@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -131,7 +131,13 @@ function SchedulePicker({
     return d;
   }, [date, hours, minutes]);
 
-  const isInPast = scheduled ? scheduled.getTime() < Date.now() : false;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 10_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const isInPast = scheduled ? scheduled.getTime() < now : false;
 
   return (
     <div className="space-y-3">
@@ -231,7 +237,7 @@ function PreparedRotationCard({
           icon={Download}
           onClick={() =>
             sendCommand("download_prepared_rotation", {
-              folder: rotation.folder,
+              slug: rotation.slug,
             })
           }
           disabled={!connected || anyDownloading}
@@ -247,7 +253,7 @@ function PreparedRotationCard({
           icon={Ban}
           onClick={() =>
             sendCommand("cancel_prepared_download", {
-              folder: rotation.folder,
+              slug: rotation.slug,
             })
           }
           disabled={!connected}
@@ -264,7 +270,7 @@ function PreparedRotationCard({
           variant="default"
           onClick={() =>
             sendCommand("execute_prepared_rotation", {
-              folder: rotation.folder,
+              slug: rotation.slug,
             })
           }
           disabled={!connected}
@@ -292,7 +298,7 @@ function PreparedRotationCard({
           variant="default"
           onClick={() =>
             sendCommand("execute_prepared_rotation", {
-              folder: rotation.folder,
+              slug: rotation.slug,
             })
           }
           disabled={!connected}
@@ -305,7 +311,7 @@ function PreparedRotationCard({
           icon={X}
           onClick={() =>
             sendCommand("cancel_prepared_schedule", {
-              folder: rotation.folder,
+              slug: rotation.slug,
             })
           }
           disabled={!connected}
@@ -322,7 +328,7 @@ function PreparedRotationCard({
           variant="destructive"
           onClick={() =>
             sendCommand("delete_prepared_rotation", {
-              folder: rotation.folder,
+              slug: rotation.slug,
             })
           }
           disabled={!connected}
@@ -382,7 +388,7 @@ function PreparedRotationCard({
           <SchedulePicker
             onSchedule={(iso) => {
               sendCommand("schedule_prepared_rotation", {
-                folder: rotation.folder,
+                slug: rotation.slug,
                 scheduled_at: iso,
               });
               setShowScheduler(false);
@@ -578,7 +584,7 @@ export default function PreparedRotationsPage() {
         <div className="space-y-4">
           {preparedRotations.map((rotation) => (
             <PreparedRotationCard
-              key={rotation.folder}
+              key={rotation.slug}
               rotation={rotation}
               anyDownloading={anyDownloading}
               connected={connected}

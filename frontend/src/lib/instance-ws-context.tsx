@@ -47,7 +47,7 @@ export interface Connections {
 }
 
 export interface PreparedRotation {
-  folder: string;
+  slug: string;
   title: string;
   playlists: string[];
   status: "created" | "downloading" | "ready" | "scheduled" | "executing" | "completed";
@@ -73,7 +73,7 @@ export interface InstanceState {
   can_trigger_rotation: boolean;
   prepared_rotations: PreparedRotation[];
   any_downloading: boolean;
-  executing_folder: string | null;
+  executing_slug: string | null;
 }
 
 export interface LogEntry {
