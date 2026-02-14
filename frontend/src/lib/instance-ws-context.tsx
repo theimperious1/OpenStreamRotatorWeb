@@ -56,6 +56,14 @@ export interface PreparedRotation {
   scheduled_at: string | null;
 }
 
+export interface EnvConfigEntry {
+  value: string | boolean;
+  secret: boolean;
+}
+
+/** Env var name → { value, secret } mapping from OSR dashboard state. */
+export type EnvConfig = Record<string, EnvConfigEntry>;
+
 export interface InstanceState {
   status: "online" | "offline" | "paused";
   manual_pause: boolean;
@@ -74,6 +82,7 @@ export interface InstanceState {
   prepared_rotations: PreparedRotation[];
   any_downloading: boolean;
   executing_slug: string | null;
+  env_config?: EnvConfig;
 }
 
 export interface LogEntry {
@@ -152,6 +161,15 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
             setState(msg.data);
           } else if (msg.type === "log") {
             setLogs((prev) => [msg.data, ...prev].slice(0, 1000));
+          } else if (msg.type === "log_history") {
+            // Batch of historical logs (oldest-first) sent on connect
+            const history: LogEntry[] = Array.isArray(msg.data) ? msg.data : [];
+            setLogs((prev) => {
+              // History is oldest-first, reverse for newest-first display
+              const reversed = [...history].reverse();
+              // Merge: history at the bottom, any live logs on top
+              return [...prev, ...reversed].slice(0, 1000);
+            });
           } else if (msg.type === "command_ack") {
             const delivered = msg.data?.delivered ?? false;
             const action = lastActionRef.current.replace(/_/g, " ");

@@ -24,11 +24,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useTeam } from "@/lib/team-context";
+import { useTeam, useMyRole } from "@/lib/team-context";
 import {
   useInstanceWs,
   type PreparedRotation,
-  type PlaylistConfig,
 } from "@/lib/instance-ws-context";
 import {
   Loader2,
@@ -216,11 +215,13 @@ function PreparedRotationCard({
   rotation,
   anyDownloading,
   connected,
+  canManageContent,
   sendCommand,
 }: {
   rotation: PreparedRotation;
   anyDownloading: boolean;
   connected: boolean;
+  canManageContent: boolean;
   sendCommand: (action: string, payload?: Record<string, unknown>) => void;
 }) {
   const [showScheduler, setShowScheduler] = useState(false);
@@ -240,7 +241,7 @@ function PreparedRotationCard({
               slug: rotation.slug,
             })
           }
-          disabled={!connected || anyDownloading}
+          disabled={!connected || anyDownloading || !canManageContent}
         />
       );
     }
@@ -256,7 +257,7 @@ function PreparedRotationCard({
               slug: rotation.slug,
             })
           }
-          disabled={!connected}
+          disabled={!connected || !canManageContent}
         />
       );
     }
@@ -273,7 +274,7 @@ function PreparedRotationCard({
               slug: rotation.slug,
             })
           }
-          disabled={!connected}
+          disabled={!connected || !canManageContent}
         />
       );
       btns.push(
@@ -301,7 +302,7 @@ function PreparedRotationCard({
               slug: rotation.slug,
             })
           }
-          disabled={!connected}
+          disabled={!connected || !canManageContent}
         />
       );
       btns.push(
@@ -314,7 +315,7 @@ function PreparedRotationCard({
               slug: rotation.slug,
             })
           }
-          disabled={!connected}
+          disabled={!connected || !canManageContent}
         />
       );
     }
@@ -331,7 +332,7 @@ function PreparedRotationCard({
               slug: rotation.slug,
             })
           }
-          disabled={!connected}
+          disabled={!connected || !canManageContent}
         />
       );
     }
@@ -405,6 +406,7 @@ function PreparedRotationCard({
 
 export default function PreparedRotationsPage() {
   const { activeTeam, loading: teamLoading } = useTeam();
+  const { canManageContent } = useMyRole();
   const instance = activeTeam?.instances?.[0] ?? null;
   const { state, sendCommand, connected } = useInstanceWs();
 
@@ -485,14 +487,14 @@ export default function PreparedRotationsPage() {
               icon={Trash2}
               variant="outline"
               onClick={() => sendCommand("clear_completed_prepared")}
-              disabled={!connected}
+              disabled={!connected || !canManageContent}
             />
           )}
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowCreateForm(!showCreateForm)}
-            disabled={!connected}
+            disabled={!connected || !canManageContent}
           >
             <Plus className="h-4 w-4 mr-2" />
             New Prepared Rotation
@@ -588,6 +590,7 @@ export default function PreparedRotationsPage() {
               rotation={rotation}
               anyDownloading={anyDownloading}
               connected={connected}
+              canManageContent={canManageContent}
               sendCommand={sendCommand}
             />
           ))}

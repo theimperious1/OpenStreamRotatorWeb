@@ -117,6 +117,25 @@ async def browser_dashboard_ws(websocket: WebSocket, instance_id: str, token: st
                 # Only owner, content_manager, moderator can send commands
                 if member_role in ("owner", "content_manager", "moderator"):
                     command = data.get("data", {})
+
+                    # Extra gating: reload_env requires content_manager or above
+                    if command.get("action") == "reload_env" and member_role not in ("owner", "content_manager"):
+                        logger.warning(f"reload_env denied for role={member_role}")
+                        await websocket.send_json({
+                            "type": "error",
+                            "data": {"message": "Insufficient permissions for reload_env"},
+                        })
+                        continue
+
+                    # Extra gating: update_env requires owner only
+                    if command.get("action") == "update_env" and member_role != "owner":
+                        logger.warning(f"update_env denied for role={member_role}")
+                        await websocket.send_json({
+                            "type": "error",
+                            "data": {"message": "Only the team owner can edit environment variables"},
+                        })
+                        continue
+
                     logger.info(f"Browser command for instance {instance_id}: {command}")
                     logger.info(f"OSR connections: {list(manager.osr_connections.keys())}")
                     delivered = await manager.send_command_to_osr(instance_id, command)

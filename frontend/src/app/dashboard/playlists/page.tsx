@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { useTeam } from "@/lib/team-context";
+import { useTeam, useMyRole } from "@/lib/team-context";
 import { useInstanceWs } from "@/lib/instance-ws-context";
 import type { PlaylistConfig } from "@/lib/instance-ws-context";
 import {
@@ -315,6 +315,8 @@ function PlaylistCard({
   playlist,
   isActive,
   connected,
+  canControl,
+  canManageContent,
   onToggle,
   onEdit,
   onDelete,
@@ -322,6 +324,8 @@ function PlaylistCard({
   playlist: PlaylistConfig;
   isActive: boolean;
   connected: boolean;
+  canControl: boolean;
+  canManageContent: boolean;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -346,7 +350,7 @@ function PlaylistCard({
             )}
             <button
               onClick={onToggle}
-              disabled={!connected}
+              disabled={!connected || !canControl}
               title={playlist.enabled ? "Disable playlist" : "Enable playlist"}
               className="hover:opacity-80 disabled:opacity-40"
             >
@@ -390,7 +394,7 @@ function PlaylistCard({
             size="sm"
             className="h-7 text-xs"
             onClick={onEdit}
-            disabled={!connected}
+            disabled={!connected || !canManageContent}
           >
             <Pencil className="h-3 w-3 mr-1" />
             Edit
@@ -421,7 +425,7 @@ function PlaylistCard({
               size="sm"
               className="h-7 text-xs ml-auto text-muted-foreground hover:text-red-500"
               onClick={() => setConfirmDelete(true)}
-              disabled={!connected}
+              disabled={!connected || !canManageContent}
             >
               <Trash2 className="h-3 w-3 mr-1" />
               Remove
@@ -437,6 +441,7 @@ function PlaylistCard({
 
 export default function PlaylistsPage() {
   const { activeTeam, loading: teamLoading } = useTeam();
+  const { canControl, canManageContent } = useMyRole();
   const instance = activeTeam?.instances?.[0] ?? null;
   const { state, sendCommand, connected } = useInstanceWs();
 
@@ -514,7 +519,7 @@ export default function PlaylistsPage() {
             variant="outline"
             size="sm"
             onClick={() => setShowAddForm(!showAddForm)}
-            disabled={!connected}
+            disabled={!connected || !canManageContent}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Playlist
@@ -523,7 +528,7 @@ export default function PlaylistsPage() {
             label="Trigger Rotation"
             icon={RefreshCw}
             onClick={() => sendCommand("trigger_rotation")}
-            disabled={!instance || !connected || !canTriggerRotation}
+            disabled={!instance || !connected || !canTriggerRotation || !canControl}
           />
         </div>
       </div>
@@ -572,6 +577,8 @@ export default function PlaylistsPage() {
                 playlist={playlist}
                 isActive={!!isActive}
                 connected={connected}
+                canControl={canControl}
+                canManageContent={canManageContent}
                 onToggle={() => handleToggle(playlist.name, playlist.enabled)}
                 onEdit={() => setEditingName(playlist.name)}
                 onDelete={() => handleRemove(playlist.name)}

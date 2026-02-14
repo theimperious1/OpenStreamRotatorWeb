@@ -11,6 +11,7 @@ State flows:   OSR instance → backend → browser(s)
 import asyncio
 import json
 import logging
+from collections import deque
 from datetime import datetime, timezone
 from fastapi import WebSocket, WebSocketDisconnect
 from sqlalchemy import select
@@ -19,6 +20,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import OSRInstance, InstanceStatus
 
 logger = logging.getLogger(__name__)
+
+# Maximum number of log entries cached per instance
+LOG_CACHE_SIZE = 500
 
 
 class ConnectionManager:
@@ -31,6 +35,8 @@ class ConnectionManager:
         self.browser_connections: dict[str, set[WebSocket]] = {}
         # instance_id → latest state snapshot (for new browser connections)
         self.state_cache: dict[str, dict] = {}
+        # instance_id → ring buffer of recent log entries
+        self.log_cache: dict[str, deque] = {}
 
     # ── OSR Instance connections ──
 
@@ -71,6 +77,15 @@ class ConnectionManager:
         cached = self.state_cache.get(instance_id)
         if cached:
             await websocket.send_json({"type": "state", "data": cached})
+
+        # Send cached log entries so newly-connected browsers have history
+        cached_logs = self.log_cache.get(instance_id)
+        if cached_logs:
+            # Send oldest-first as a batch so the frontend can prepend them
+            await websocket.send_json({
+                "type": "log_history",
+                "data": list(cached_logs),
+            })
 
     def disconnect_browser(self, instance_id: str, websocket: WebSocket):
         subs = self.browser_connections.get(instance_id)
@@ -117,7 +132,12 @@ class ConnectionManager:
         await self.broadcast_to_browsers(instance_id, {"type": "state", "data": state})
 
     async def handle_log_entry(self, instance_id: str, log: dict):
-        """Forward a log entry from OSR to subscribed browsers."""
+        """Forward a log entry from OSR to subscribed browsers and cache it."""
+        # Cache for future browser connections
+        if instance_id not in self.log_cache:
+            self.log_cache[instance_id] = deque(maxlen=LOG_CACHE_SIZE)
+        self.log_cache[instance_id].append(log)
+
         await self.broadcast_to_browsers(instance_id, {"type": "log", "data": log})
 
 

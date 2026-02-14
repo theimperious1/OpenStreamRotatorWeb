@@ -5,11 +5,14 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
 import { listTeams, getTeam, type Team, type TeamDetail } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+
+export type TeamRole = "owner" | "content_manager" | "moderator" | "viewer";
 
 interface TeamState {
   teams: Team[];
@@ -81,4 +84,43 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
 export function useTeam() {
   return useContext(TeamContext);
+}
+
+/**
+ * Convenience hook — returns the current user's role in the active team.
+ *
+ * Role hierarchy (most → least privileged):
+ *   owner > content_manager > moderator > viewer
+ *
+ * Also exposes boolean helpers so pages don't have to repeat
+ * role comparison logic everywhere.
+ */
+export function useMyRole() {
+  const { user } = useAuth();
+  const { activeTeam } = useTeam();
+
+  return useMemo(() => {
+    const role: TeamRole =
+      activeTeam?.members?.find((m) => m.user_id === user?.id)?.role as TeamRole ?? "viewer";
+
+    const ROLE_RANK: Record<TeamRole, number> = {
+      owner: 4,
+      content_manager: 3,
+      moderator: 2,
+      viewer: 1,
+    };
+
+    const atLeast = (min: TeamRole) => ROLE_RANK[role] >= ROLE_RANK[min];
+
+    return {
+      role,
+      isOwner: role === "owner",
+      /** Can pause/resume, skip, trigger rotation, toggle playlists */
+      canControl: atLeast("moderator"),
+      /** Can CRUD playlists, prepared rotations, change settings */
+      canManageContent: atLeast("content_manager"),
+      /** True for viewer — read-only access */
+      isViewOnly: role === "viewer",
+    };
+  }, [user?.id, activeTeam?.members]);
 }

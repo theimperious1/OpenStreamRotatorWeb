@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useTeam } from "@/lib/team-context";
+import { useTeam, useMyRole } from "@/lib/team-context";
 import { useInstanceWs, type LogEntry } from "@/lib/instance-ws-context";
 import {
   Monitor,
@@ -69,6 +69,7 @@ function LogLevelBadge({ level }: { level: LogEntry["level"] }) {
 
 export default function DashboardPage() {
   const { activeTeam, loading: teamLoading } = useTeam();
+  const { canControl } = useMyRole();
   const instance = activeTeam?.instances?.[0] ?? null;
   const { state, logs, connected, sendCommand } = useInstanceWs();
 
@@ -166,6 +167,7 @@ export default function DashboardPage() {
                 variant={isPaused && isManualPause ? "default" : "outline"}
                 size="sm"
                 className="gap-1.5"
+                disabled={!canControl}
                 onClick={() =>
                   sendCommand(
                     isPaused && isManualPause ? "resume_stream" : "pause_stream"

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useTeam } from "@/lib/team-context";
+import { useTeam, useMyRole } from "@/lib/team-context";
 import { useInstanceWs } from "@/lib/instance-ws-context";
 import {
   PlayCircle,
@@ -65,6 +65,7 @@ function CommandButton({
 
 export default function QueuePage() {
   const { activeTeam, loading: teamLoading } = useTeam();
+  const { canControl } = useMyRole();
   const instance = activeTeam?.instances?.[0] ?? null;
   const { state, sendCommand, connected, lastAck } = useInstanceWs();
 
@@ -133,13 +134,13 @@ export default function QueuePage() {
             label="Skip Current"
             icon={SkipForward}
             onClick={() => sendCommand("skip_video")}
-            disabled={!instance || !connected || !canSkip}
+            disabled={!instance || !connected || !canSkip || !canControl}
           />
           <CommandButton
             label="Trigger Rotation"
             icon={RefreshCw}
             onClick={() => sendCommand("trigger_rotation")}
-            disabled={!instance || !connected || !canTriggerRotation}
+            disabled={!instance || !connected || !canTriggerRotation || !canControl}
           />
         </div>
       </div>
@@ -170,7 +171,7 @@ export default function QueuePage() {
                 label="Skip"
                 icon={SkipForward}
                 onClick={() => sendCommand("skip_video")}
-                disabled={!instance || !connected || !canSkip}
+                disabled={!instance || !connected || !canSkip || !canControl}
               />
             </div>
           </CardContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -12,10 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { useTeam } from "@/lib/team-context";
+import { useTeam, useMyRole } from "@/lib/team-context";
 import { useInstanceWs } from "@/lib/instance-ws-context";
-import type { OsrSettings } from "@/lib/instance-ws-context";
-import { Save, Loader2 } from "lucide-react";
+import type { OsrSettings, EnvConfig } from "@/lib/instance-ws-context";
+import { Save, Loader2, Eye, EyeOff, Lock } from "lucide-react";
 
 function SettingRow({
   label,
@@ -40,15 +40,18 @@ function SettingRow({
 function ToggleButton({
   enabled,
   onToggle,
+  disabled,
 }: {
   enabled: boolean;
   onToggle?: () => void;
+  disabled?: boolean;
 }) {
   return (
     <Button
       variant={enabled ? "default" : "outline"}
       size="sm"
       onClick={onToggle}
+      disabled={disabled}
       className="w-16"
     >
       {enabled ? "On" : "Off"}
@@ -58,6 +61,7 @@ function ToggleButton({
 
 export default function SettingsPage() {
   const { activeTeam } = useTeam();
+  const { canManageContent, isOwner } = useMyRole();
   const instance = activeTeam?.instances?.[0] ?? null;
   const { state, sendCommand, connected, lastAck } = useInstanceWs();
 
@@ -67,13 +71,33 @@ export default function SettingsPage() {
   // Local draft state for editable fields
   const [draft, setDraft] = useState<OsrSettings>({});
   const [dirty, setDirty] = useState(false);
+  const [envDraft, setEnvDraft] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const skipNextSync = useRef(false);
 
-  // Sync remote settings into local draft when they first arrive or change
+  const updateEnvDraft = useCallback((key: string, value: string) => {
+    setEnvDraft((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  const anyDirty = !saving && (dirty || Object.keys(envDraft).length > 0);
+
+  // Sync remote settings into local draft when they first arrive or change.
+  // After a save we skip one cycle so stale remote data doesn't overwrite the
+  // draft. The NEXT state push (with server-confirmed values) syncs normally.
   useEffect(() => {
     if (remoteSettings && !dirty) {
+      if (skipNextSync.current) {
+        skipNextSync.current = false;
+        return;
+      }
       setDraft(remoteSettings);
+      // Also clear any pending env edits & saving flag — remote has caught up
+      if (saving) {
+        setEnvDraft({});
+        setSaving(false);
+      }
     }
-  }, [remoteSettings, dirty]);
+  }, [remoteSettings, dirty, saving]);
 
   const updateDraft = useCallback(
     (key: keyof OsrSettings, value: OsrSettings[keyof OsrSettings]) => {
@@ -91,7 +115,7 @@ export default function SettingsPage() {
   );
 
   function handleSaveAll() {
-    // Send every changed key
+    // Send every changed settings.json key
     const keys = Object.keys(draft) as (keyof OsrSettings)[];
     for (const key of keys) {
       if (
@@ -101,15 +125,19 @@ export default function SettingsPage() {
         sendSetting(key, draft[key]);
       }
     }
+    // Send every changed env var
+    for (const [key, value] of Object.entries(envDraft)) {
+      sendCommand("update_env", { key, value });
+    }
+    skipNextSync.current = true;
+    setSaving(true);
     setDirty(false);
+    // envDraft is NOT cleared here — keeps merged config showing pending values
+    // until the server responds and the sync effect clears it
   }
 
   function handleToggle(key: keyof OsrSettings) {
-    const newVal = !draft[key];
-    updateDraft(key, newVal);
-    // Toggles apply immediately
-    sendSetting(key, newVal);
-    setDirty(false);
+    updateDraft(key, !draft[key]);
   }
 
   return (
@@ -118,7 +146,7 @@ export default function SettingsPage() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
           <p className="text-muted-foreground">
-            Configure your OSR instance. Toggle changes apply immediately.
+            Configure your OSR instance. Press Save to apply changes.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -145,8 +173,8 @@ export default function SettingsPage() {
               OSR Unreachable
             </Badge>
           )}
-          <Button size="sm" onClick={handleSaveAll} disabled={!dirty}>
-            {dirty ? (
+          <Button size="sm" onClick={handleSaveAll} disabled={!anyDirty || !canManageContent}>
+            {anyDirty ? (
               <>
                 <Save className="h-4 w-4 mr-2" />
                 Save Changes
@@ -198,6 +226,7 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     updateDraft("stream_title_template", e.target.value)
                   }
+                  disabled={!canManageContent}
                   className="w-[400px] text-sm"
                 />
               </SettingRow>
@@ -209,6 +238,7 @@ export default function SettingsPage() {
                 <ToggleButton
                   enabled={!!draft.debug_mode}
                   onToggle={() => handleToggle("debug_mode")}
+                  disabled={!canManageContent}
                 />
               </SettingRow>
               <Separator />
@@ -219,6 +249,7 @@ export default function SettingsPage() {
                 <ToggleButton
                   enabled={!!draft.notify_video_transitions}
                   onToggle={() => handleToggle("notify_video_transitions")}
+                  disabled={!canManageContent}
                 />
               </SettingRow>
             </CardContent>
@@ -251,6 +282,7 @@ export default function SettingsPage() {
                   }
                   min={1}
                   max={10}
+                  disabled={!canManageContent}
                   className="w-20 text-sm text-center"
                 />
               </SettingRow>
@@ -270,6 +302,7 @@ export default function SettingsPage() {
                   }
                   min={1}
                   max={10}
+                  disabled={!canManageContent}
                   className="w-20 text-sm text-center"
                 />
               </SettingRow>
@@ -303,6 +336,7 @@ export default function SettingsPage() {
                   }
                   min={1}
                   max={20}
+                  disabled={!canManageContent}
                   className="w-20 text-sm text-center"
                 />
               </SettingRow>
@@ -314,6 +348,7 @@ export default function SettingsPage() {
                 <ToggleButton
                   enabled={!!draft.yt_dlp_use_cookies}
                   onToggle={() => handleToggle("yt_dlp_use_cookies")}
+                  disabled={!canManageContent}
                 />
               </SettingRow>
               <Separator />
@@ -326,6 +361,7 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     updateDraft("yt_dlp_browser_for_cookies", e.target.value)
                   }
+                  disabled={!canManageContent}
                   className="w-32 text-sm"
                 />
               </SettingRow>
@@ -337,82 +373,501 @@ export default function SettingsPage() {
                 <ToggleButton
                   enabled={!!draft.yt_dlp_verbose}
                   onToggle={() => handleToggle("yt_dlp_verbose")}
+                  disabled={!canManageContent}
                 />
               </SettingRow>
             </CardContent>
           </Card>
 
-          {/* Platform Connections — Read Only */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Platform Connections</CardTitle>
-              <CardDescription>
-                Configured in .env on the host machine. Shown here for
-                reference.
-                <Badge variant="secondary" className="ml-2 text-[10px]">
-                  Read-only
-                </Badge>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-1">
-              <SettingRow
-                label="Twitch"
-                description="ENABLE_TWITCH, TWITCH_CLIENT_ID, TARGET_TWITCH_STREAMER"
-              >
-                <ConnectionBadge
-                  configured={connections?.twitch ?? false}
-                  enabled={connections?.twitch_enabled ?? false}
-                />
-              </SettingRow>
-              <Separator />
-              <SettingRow
-                label="Kick"
-                description="ENABLE_KICK, KICK_CLIENT_ID, TARGET_KICK_STREAMER"
-              >
-                <ConnectionBadge
-                  configured={connections?.kick ?? false}
-                  enabled={connections?.kick_enabled ?? false}
-                />
-              </SettingRow>
-              <Separator />
-              <SettingRow
-                label="Discord Webhook"
-                description="DISCORD_WEBHOOK_URL"
-              >
-                <Badge
-                  variant="outline"
-                  className={
-                    connections?.discord_webhook
-                      ? "text-green-500 border-green-500/30"
-                      : "text-gray-500 border-gray-500/30"
-                  }
-                >
-                  {connections?.discord_webhook ? "Configured" : "Not set"}
-                </Badge>
-              </SettingRow>
-              <Separator />
-              <SettingRow
-                label="OBS WebSocket"
-                description="OBS_HOST, OBS_PORT, OBS_PASSWORD"
-              >
-                <Badge
-                  variant="outline"
-                  className={
-                    connections?.obs
-                      ? "text-green-500 border-green-500/30"
-                      : "text-red-500 border-red-500/30"
-                  }
-                >
-                  {connections?.obs ? "Connected" : "Disconnected"}
-                </Badge>
-              </SettingRow>
-            </CardContent>
-          </Card>
+          {/* Environment Configuration */}
+          <EnvironmentSection
+            envConfig={state?.env_config}
+            connections={connections}
+            connected={connected}
+            isOwner={isOwner}
+            canManageContent={canManageContent}
+            envDraft={envDraft}
+            onEnvChange={updateEnvDraft}
+            sendCommand={sendCommand}
+          />
         </>
       )}
     </div>
   );
 }
+
+// ── Environment Configuration Section ────────
+
+function EnvironmentSection({
+  envConfig: rawEnvConfig,
+  connections,
+  connected,
+  isOwner,
+  canManageContent,
+  envDraft,
+  onEnvChange,
+  sendCommand,
+}: {
+  envConfig?: EnvConfig;
+  connections?: { obs: boolean; twitch: boolean; kick: boolean; discord_webhook: boolean; twitch_enabled: boolean; kick_enabled: boolean };
+  connected: boolean;
+  isOwner: boolean;
+  canManageContent: boolean;
+  envDraft: Record<string, string>;
+  onEnvChange: (key: string, value: string) => void;
+  sendCommand: (action: string, payload?: Record<string, unknown>) => void;
+}) {
+  const sendEnv = onEnvChange;
+
+  // Merge draft values into envConfig so children display pending changes
+  const envConfig = useMemo((): EnvConfig | undefined => {
+    if (!rawEnvConfig) return rawEnvConfig;
+    const merged: EnvConfig = { ...rawEnvConfig };
+    for (const [key, value] of Object.entries(envDraft)) {
+      if (key in merged) {
+        merged[key] = merged[key].secret
+          ? { value: "pending", secret: true }
+          : { value, secret: false };
+      }
+    }
+    return merged;
+  }, [rawEnvConfig, envDraft]);
+
+  return (
+    <>
+      {/* OBS Configuration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">OBS Configuration</CardTitle>
+              <CardDescription>
+                OBS WebSocket connection and scene names
+                {!isOwner && (
+                  <Badge variant="secondary" className="ml-2 text-[10px]">
+                    <Lock className="h-3 w-3 mr-0.5 inline" />
+                    Owner only
+                  </Badge>
+                )}
+              </CardDescription>
+            </div>
+            <Badge
+              variant="outline"
+              className={
+                connections?.obs
+                  ? "text-green-500 border-green-500/30"
+                  : "text-red-500 border-red-500/30"
+              }
+            >
+              {connections?.obs ? "Connected" : "Disconnected"}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-1">
+          <EnvRow
+            label="OBS Host"
+            envKey="OBS_HOST"
+            description="IP address of the OBS WebSocket server"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+          <Separator />
+          <EnvRow
+            label="OBS Port"
+            envKey="OBS_PORT"
+            description="Port number for OBS WebSocket"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+            inputType="number"
+          />
+          <Separator />
+          <EnvRow
+            label="OBS Password"
+            envKey="OBS_PASSWORD"
+            description="OBS WebSocket authentication password"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+          <Separator />
+          <EnvRow
+            label="Pause Scene"
+            envKey="SCENE_PAUSE"
+            description='Scene shown when stream is paused (e.g. "LIVE")'
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+          <Separator />
+          <EnvRow
+            label="Stream Scene"
+            envKey="SCENE_STREAM"
+            description='Scene shown during normal playback (e.g. "OFFLINE")'
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+          <Separator />
+          <EnvRow
+            label="Rotation Screen Scene"
+            envKey="SCENE_ROTATION_SCREEN"
+            description="Scene shown during rotation transitions"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+          <Separator />
+          <EnvRow
+            label="VLC Source Name"
+            envKey="VLC_SOURCE_NAME"
+            description="Name of the VLC media source in OBS"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Twitch Configuration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Twitch</CardTitle>
+              <CardDescription>
+                Twitch API credentials and live detection
+                {!isOwner && (
+                  <Badge variant="secondary" className="ml-2 text-[10px]">
+                    <Lock className="h-3 w-3 mr-0.5 inline" />
+                    Owner only
+                  </Badge>
+                )}
+              </CardDescription>
+            </div>
+            <ConnectionBadge
+              configured={connections?.twitch ?? false}
+              enabled={connections?.twitch_enabled ?? false}
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-1">
+          <EnvToggleRow
+            label="Enable Twitch"
+            envKey="ENABLE_TWITCH"
+            description="Enable Twitch live detection and category updates"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+          <Separator />
+          <EnvRow
+            label="Target Streamer"
+            envKey="TARGET_TWITCH_STREAMER"
+            description="Twitch username to monitor for live status"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+          <Separator />
+          <EnvRow
+            label="Client ID"
+            envKey="TWITCH_CLIENT_ID"
+            description="Twitch application Client ID"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+          <Separator />
+          <EnvRow
+            label="Client Secret"
+            envKey="TWITCH_CLIENT_SECRET"
+            description="Twitch application Client Secret"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Kick Configuration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Kick</CardTitle>
+              <CardDescription>
+                Kick API credentials and live detection
+                {!isOwner && (
+                  <Badge variant="secondary" className="ml-2 text-[10px]">
+                    <Lock className="h-3 w-3 mr-0.5 inline" />
+                    Owner only
+                  </Badge>
+                )}
+              </CardDescription>
+            </div>
+            <ConnectionBadge
+              configured={connections?.kick ?? false}
+              enabled={connections?.kick_enabled ?? false}
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-1">
+          <EnvToggleRow
+            label="Enable Kick"
+            envKey="ENABLE_KICK"
+            description="Enable Kick live detection and category updates"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+          <Separator />
+          <EnvRow
+            label="Target Streamer"
+            envKey="TARGET_KICK_STREAMER"
+            description="Kick channel to monitor for live status"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+          <Separator />
+          <EnvRow
+            label="Client ID"
+            envKey="KICK_CLIENT_ID"
+            description="Kick application Client ID"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+          <Separator />
+          <EnvRow
+            label="Client Secret"
+            envKey="KICK_CLIENT_SECRET"
+            description="Kick application Client Secret"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Discord Configuration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Discord</CardTitle>
+              <CardDescription>
+                Webhook for notifications
+                {!isOwner && (
+                  <Badge variant="secondary" className="ml-2 text-[10px]">
+                    <Lock className="h-3 w-3 mr-0.5 inline" />
+                    Owner only
+                  </Badge>
+                )}
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <EnvRow
+            label="Webhook URL"
+            envKey="DISCORD_WEBHOOK_URL"
+            description="Discord webhook URL for sending notifications"
+            envConfig={envConfig}
+            disabled={!isOwner || !connected}
+            onSave={sendEnv}
+            wide
+          />
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+// ── Env Row (text input with save-on-blur) ───
+
+function EnvRow({
+  label,
+  envKey,
+  description,
+  envConfig,
+  disabled,
+  onSave,
+  inputType = "text",
+  wide = false,
+}: {
+  label: string;
+  envKey: string;
+  description: string;
+  envConfig?: EnvConfig;
+  disabled: boolean;
+  onSave: (key: string, value: string) => void;
+  inputType?: "text" | "number";
+  wide?: boolean;
+}) {
+  const entry = envConfig?.[envKey];
+  const isSecret = entry?.secret ?? false;
+  const remoteValue = isSecret ? "" : String(entry?.value ?? "");
+  const isModified = isSecret && typeof entry?.value === "string";
+  const isConfigured = isSecret ? !!entry?.value : false;
+
+  const [localValue, setLocalValue] = useState(remoteValue);
+  const [editing, setEditing] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+
+  // Sync from remote when not editing
+  useEffect(() => {
+    if (!editing && !isSecret) {
+      setLocalValue(remoteValue);
+    }
+  }, [remoteValue, editing, isSecret]);
+
+  const handleSave = useCallback(() => {
+    if (disabled) return;
+    const trimmed = localValue.trim();
+    if (isSecret && !trimmed) {
+      // Don't send empty string for secrets (user just cancelled)
+      setEditing(false);
+      setLocalValue("");
+      return;
+    }
+    if (!isSecret && trimmed === remoteValue) {
+      setEditing(false);
+      return;
+    }
+    onSave(envKey, trimmed);
+    setEditing(false);
+    if (isSecret) setLocalValue("");
+  }, [disabled, localValue, remoteValue, isSecret, envKey, onSave]);
+
+  if (isSecret && !editing) {
+    return (
+      <SettingRow label={label} description={description}>
+        <div className="flex items-center gap-2">
+          <Badge
+            variant="outline"
+            className={
+              isModified
+                ? "text-yellow-500 border-yellow-500/30"
+                : isConfigured
+                  ? "text-green-500 border-green-500/30"
+                  : "text-gray-500 border-gray-500/30"
+            }
+          >
+            {isModified ? "Modified (unsaved)" : isConfigured ? "Configured" : "Not set"}
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditing(true)}
+            disabled={disabled}
+            className="text-xs"
+          >
+            Change
+          </Button>
+        </div>
+      </SettingRow>
+    );
+  }
+
+  return (
+    <SettingRow label={label} description={description}>
+      <div className="flex items-center gap-2">
+        <Input
+          type={isSecret && !showSecret ? "password" : inputType}
+          value={localValue}
+          placeholder={isSecret ? "Enter new value…" : ""}
+          onChange={(e) => {
+            setLocalValue(e.target.value);
+            if (!editing) setEditing(true);
+          }}
+          onBlur={() => {
+            // Small delay so click on Save/Cancel registers first
+            setTimeout(() => {
+              if (!isSecret && editing) handleSave();
+            }, 150);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") {
+              setEditing(false);
+              if (isSecret) setLocalValue("");
+              else setLocalValue(remoteValue);
+            }
+          }}
+          disabled={disabled}
+          className={`text-sm ${wide ? "w-[400px]" : "w-48"}`}
+          autoFocus={isSecret && editing}
+        />
+        {isSecret && editing && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setShowSecret((s) => !s)}
+            >
+              {showSecret ? (
+                <EyeOff className="h-3.5 w-3.5" />
+              ) : (
+                <Eye className="h-3.5 w-3.5" />
+              )}
+            </Button>
+            <Button size="sm" className="text-xs" onClick={handleSave}>
+              Save
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={() => {
+                setEditing(false);
+                setLocalValue("");
+              }}
+            >
+              Cancel
+            </Button>
+          </>
+        )}
+      </div>
+    </SettingRow>
+  );
+}
+
+// ── Env Toggle Row (for ENABLE_TWITCH, ENABLE_KICK) ─
+
+function EnvToggleRow({
+  label,
+  envKey,
+  description,
+  envConfig,
+  disabled,
+  onSave,
+}: {
+  label: string;
+  envKey: string;
+  description: string;
+  envConfig?: EnvConfig;
+  disabled: boolean;
+  onSave: (key: string, value: string) => void;
+}) {
+  const entry = envConfig?.[envKey];
+  const enabled = String(entry?.value ?? "").toLowerCase() === "true";
+
+  return (
+    <SettingRow label={label} description={description}>
+      <ToggleButton
+        enabled={enabled}
+        onToggle={() => onSave(envKey, enabled ? "false" : "true")}
+        disabled={disabled}
+      />
+    </SettingRow>
+  );
+}
+
+// ── Connection badge ──
 
 function ConnectionBadge({
   configured,
