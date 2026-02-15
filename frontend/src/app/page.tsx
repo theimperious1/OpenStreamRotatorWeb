@@ -26,7 +26,7 @@ export default function HomePage() {
 
         <div className="space-y-3">
           <Button asChild size="lg" className="w-full">
-            <a href={`${apiBase}/auth/discord/login`}>
+            <a href={`${apiBase}/auth/discord/login?origin=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : '')}`}>
               <svg
                 className="h-5 w-5 mr-2"
                 viewBox="0 0 24 24"

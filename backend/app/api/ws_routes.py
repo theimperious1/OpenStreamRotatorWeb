@@ -104,7 +104,7 @@ async def browser_dashboard_ws(websocket: WebSocket, instance_id: str, token: st
             return
         member_role = membership.role
 
-    await manager.connect_browser(instance_id, websocket, role=member_role)
+    await manager.connect_browser(instance_id, websocket, role=member_role, user_id=user_id)
     logger.info(f"Browser connected for instance {instance_id}, role={member_role}, osr_connected={instance_id in manager.osr_connections}")
 
     try:

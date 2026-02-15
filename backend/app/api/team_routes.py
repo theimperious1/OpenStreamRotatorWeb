@@ -265,6 +265,15 @@ async def remove_member(
     await db.delete(target)
     await db.commit()
 
+    # Kick the removed user from any active WebSocket connections
+    inst_result = await db.execute(
+        select(OSRInstance.id).where(OSRInstance.team_id == team_id)
+    )
+    instance_ids = [row[0] for row in inst_result.all()]
+    if instance_ids:
+        from app.websocket import manager as ws_manager
+        await ws_manager.kick_user(str(target.user_id), instance_ids)
+
 
 # ──────────────────────────────────────────────
 # OSR Instance management

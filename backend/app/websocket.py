@@ -31,8 +31,8 @@ class ConnectionManager:
     def __init__(self):
         # instance_id → WebSocket (one OSR instance per connection)
         self.osr_connections: dict[str, WebSocket] = {}
-        # instance_id → dict of {WebSocket: role_str}
-        self.browser_connections: dict[str, dict[WebSocket, str]] = {}
+        # instance_id → dict of {WebSocket: {"role": str, "user_id": str}}
+        self.browser_connections: dict[str, dict[WebSocket, dict]] = {}
         # instance_id → latest state snapshot (for new browser connections)
         self.state_cache: dict[str, dict] = {}
         # instance_id → ring buffer of recent log entries
@@ -66,12 +66,12 @@ class ConnectionManager:
 
     # ── Browser connections ──
 
-    async def connect_browser(self, instance_id: str, websocket: WebSocket, role: str = "viewer"):
+    async def connect_browser(self, instance_id: str, websocket: WebSocket, role: str = "viewer", user_id: str = ""):
         await websocket.accept()
         if instance_id not in self.browser_connections:
             self.browser_connections[instance_id] = {}
-        self.browser_connections[instance_id][websocket] = role
-        logger.info(f"Browser subscribed to instance {instance_id} (role={role})")
+        self.browser_connections[instance_id][websocket] = {"role": role, "user_id": user_id}
+        logger.info(f"Browser subscribed to instance {instance_id} (role={role}, user={user_id})")
 
         # Send cached state immediately so the UI populates without waiting
         cached = self.state_cache.get(instance_id)
@@ -95,6 +95,26 @@ class ConnectionManager:
             if not subs:
                 del self.browser_connections[instance_id]
 
+    async def kick_user(self, user_id: str, instance_ids: list[str]):
+        """Close all WebSocket connections for a user across the given instances.
+
+        Called when a team member is removed so they stop receiving live data.
+        """
+        for iid in instance_ids:
+            subs = self.browser_connections.get(iid)
+            if not subs:
+                continue
+            to_kick = [ws for ws, info in subs.items() if info["user_id"] == user_id]
+            for ws in to_kick:
+                subs.pop(ws, None)
+                try:
+                    await ws.close(code=4003, reason="Removed from team")
+                except Exception:
+                    pass  # already closed
+                logger.info(f"Kicked user {user_id} from instance {iid}")
+            if not subs:
+                del self.browser_connections[iid]
+
     async def broadcast_to_browsers(self, instance_id: str, message: dict, exclude_roles: set[str] | None = None):
         """Send a message to all browsers watching this instance.
         
@@ -102,8 +122,8 @@ class ConnectionManager:
         """
         subs = self.browser_connections.get(instance_id, {})
         dead = []
-        for ws, role in subs.items():
-            if exclude_roles and role in exclude_roles:
+        for ws, info in subs.items():
+            if exclude_roles and info["role"] in exclude_roles:
                 continue
             try:
                 await ws.send_json(message)

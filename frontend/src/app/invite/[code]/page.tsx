@@ -190,7 +190,7 @@ export default function InviteAcceptPage() {
                 <>
                   <Button asChild className="w-full" size="lg">
                     <a
-                      href={`${apiBase}/auth/discord/login?redirect=/invite/${params.code}`}
+                      href={`${apiBase}/auth/discord/login?redirect=/invite/${params.code}&origin=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : '')}`}
                     >
                       <svg
                         className="h-5 w-5 mr-2"

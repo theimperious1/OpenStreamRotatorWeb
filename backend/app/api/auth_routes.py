@@ -24,20 +24,26 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.get("/discord/login")
-async def discord_login(request: Request, redirect: str | None = None):
+async def discord_login(request: Request, redirect: str | None = None, origin: str | None = None):
     """Redirect the user to Discord's OAuth2 authorization page.
     
-    Automatically detects the caller's origin from the Referer header
-    so the callback redirects back to the right host (localhost vs public IP).
+    Detects the caller's origin from the explicit `origin` query param,
+    falling back to the Referer header. This ensures the callback redirects
+    back to the correct host (e.g. domain name vs IP vs localhost).
     """
-    # Try to determine the frontend origin from the Referer header
-    referer = request.headers.get("referer", "")
     frontend_origin = None
-    if referer:
-        from urllib.parse import urlparse
-        parsed = urlparse(referer)
-        if parsed.scheme and parsed.netloc:
-            frontend_origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    # Prefer explicit origin query param (set by the frontend login button)
+    if origin:
+        frontend_origin = origin
+    else:
+        # Fall back to Referer header
+        referer = request.headers.get("referer", "")
+        if referer:
+            from urllib.parse import urlparse
+            parsed = urlparse(referer)
+            if parsed.scheme and parsed.netloc:
+                frontend_origin = f"{parsed.scheme}://{parsed.netloc}"
     
     return RedirectResponse(get_discord_login_url(frontend_origin, redirect))
 
