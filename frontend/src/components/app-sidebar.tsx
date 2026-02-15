@@ -13,9 +13,9 @@ import {
   LogOut,
   FolderClock,
   Server,
-  ChevronDown,
   Tv,
   HelpCircle,
+  Heart,
 } from "lucide-react";
 import {
   Sidebar,
@@ -193,6 +193,15 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
+        <a
+          href="https://buymeacoffee.com/theimperious1"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors mb-3 px-0.5"
+        >
+          <Heart className="h-3.5 w-3.5 text-pink-500" />
+          <span>Support this project</span>
+        </a>
         <div className="flex items-center gap-2">
           <Avatar className="h-7 w-7">
             {user?.discord_avatar && (

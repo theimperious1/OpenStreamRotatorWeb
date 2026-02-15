@@ -2,6 +2,8 @@
 
 Web dashboard for [OpenStreamRotator](https://github.com/theimperious1/OpenStreamRotator) — monitor and control your 24/7 stream automation from any browser.
 
+> **Like this project?** [Buy me a coffee ☕](https://buymeacoffee.com/theimperious1)
+
 ## Features
 
 - **Real-time monitoring** — Live stream status, current video, playlist, category, OBS connection state, and uptime via WebSocket
