@@ -127,6 +127,7 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
   const [lastAck, setLastAck] = useState<{ delivered: boolean; action: string } | null>(null);
 
   const lastActionRef = useRef<string>("");
+  const prevInstanceIdRef = useRef<string | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectDelay = useRef(RECONNECT_BASE_MS);
   const mountedRef = useRef(true);
@@ -238,11 +239,18 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
       oldWs.close();
     }
 
-    // Clear stale state from previous instance
-    setState(null);
-    setLogs([]);
-    setConnected(false);
-    setLastAck(null);
+    // Clear stale state when switching to a different instance
+    if (prevInstanceIdRef.current !== instanceId) {
+      prevInstanceIdRef.current = instanceId;
+      // Use a microtask to avoid synchronous setState in effect body
+      queueMicrotask(() => {
+        if (!mountedRef.current) return;
+        setState(null);
+        setLogs([]);
+        setConnected(false);
+        setLastAck(null);
+      });
+    }
 
     if (instanceId) {
       reconnectDelay.current = RECONNECT_BASE_MS;
