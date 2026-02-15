@@ -411,10 +411,6 @@ export default function PreparedRotationsPage() {
 
   const preparedRotations = state?.prepared_rotations ?? [];
   const anyDownloading = state?.any_downloading ?? false;
-  const settings = state?.settings;
-
-  const minPlaylists = settings?.min_playlists_per_rotation ?? 2;
-  const maxPlaylists = settings?.max_playlists_per_rotation ?? 4;
 
   // Create form state
   const [title, setTitle] = useState("");
@@ -433,9 +429,7 @@ export default function PreparedRotationsPage() {
   }, []);
 
   const canCreate =
-    title.trim().length > 0 &&
-    selectedPlaylists.length >= minPlaylists &&
-    selectedPlaylists.length <= maxPlaylists;
+    title.trim().length > 0 && selectedPlaylists.length >= 1;
 
   const handleCreate = useCallback(() => {
     if (!canCreate) return;
@@ -508,8 +502,8 @@ export default function PreparedRotationsPage() {
               Create Prepared Rotation
             </CardTitle>
             <CardDescription>
-              Select {minPlaylists}–{maxPlaylists} playlists and give it a name.
-              Videos are not downloaded until you press Download.
+              Select one or more playlists and give it a name. Videos are not
+              downloaded until you press Download.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -524,7 +518,7 @@ export default function PreparedRotationsPage() {
 
             <div>
               <label className="text-sm font-medium mb-1.5 block">
-                Playlists ({selectedPlaylists.length}/{maxPlaylists})
+                Playlists ({selectedPlaylists.length} selected)
               </label>
               <div className="flex flex-wrap gap-2">
                 {enabledPlaylists.map((p) => {
@@ -535,10 +529,6 @@ export default function PreparedRotationsPage() {
                       variant={selected ? "default" : "outline"}
                       size="sm"
                       onClick={() => togglePlaylist(p.name)}
-                      disabled={
-                        !selected &&
-                        selectedPlaylists.length >= maxPlaylists
-                      }
                     >
                       {p.name}
                     </Button>
@@ -550,10 +540,9 @@ export default function PreparedRotationsPage() {
                   </p>
                 )}
               </div>
-              {selectedPlaylists.length < minPlaylists && (
+              {selectedPlaylists.length === 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Select at least {minPlaylists} playlist
-                  {minPlaylists > 1 ? "s" : ""}
+                  Select at least 1 playlist
                 </p>
               )}
             </div>
