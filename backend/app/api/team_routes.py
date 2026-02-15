@@ -71,6 +71,78 @@ async def create_team(
     return team
 
 
+@router.delete("/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_team(
+    team_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a team entirely. Only the team creator can do this."""
+    membership = await _get_membership(db, team_id, user.id)
+    _require_role(membership, TeamRole.owner)
+
+    result = await db.execute(select(Team).where(Team.id == team_id))
+    team = result.scalar_one_or_none()
+    if team is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
+    if team.created_by != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the team creator can delete the team")
+
+    # Kick all browser WebSocket connections for this team's instances
+    inst_result = await db.execute(select(OSRInstance.id).where(OSRInstance.team_id == team_id))
+    instance_ids = [row[0] for row in inst_result.all()]
+    if instance_ids:
+        from app.websocket import manager as ws_manager
+        # Kick everyone — pass all connected users
+        for iid in instance_ids:
+            subs = ws_manager.browser_connections.get(iid, {})
+            for ws in list(subs.keys()):
+                try:
+                    await ws.close(code=4003, reason="Team deleted")
+                except Exception:
+                    pass
+            ws_manager.browser_connections.pop(iid, None)
+            # Disconnect OSR instance too
+            osr_ws = ws_manager.osr_connections.pop(iid, None)
+            if osr_ws:
+                try:
+                    await osr_ws.close(code=4003, reason="Team deleted")
+                except Exception:
+                    pass
+
+    await db.delete(team)
+    await db.commit()
+
+
+@router.post("/{team_id}/leave", status_code=status.HTTP_204_NO_CONTENT)
+async def leave_team(
+    team_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Leave a team. The team creator cannot leave — they must delete the team instead."""
+    membership = await _get_membership(db, team_id, user.id)
+
+    # Creator cannot leave — must delete instead
+    result = await db.execute(select(Team).where(Team.id == team_id))
+    team = result.scalar_one_or_none()
+    if team and team.created_by == user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Team creator cannot leave. Delete the team instead.",
+        )
+
+    await db.delete(membership)
+    await db.commit()
+
+    # Kick user from active WebSocket connections
+    inst_result = await db.execute(select(OSRInstance.id).where(OSRInstance.team_id == team_id))
+    instance_ids = [row[0] for row in inst_result.all()]
+    if instance_ids:
+        from app.websocket import manager as ws_manager
+        await ws_manager.kick_user(str(user.id), instance_ids)
+
+
 @router.get("", response_model=list[TeamOut])
 async def list_teams(
     user: User = Depends(get_current_user),

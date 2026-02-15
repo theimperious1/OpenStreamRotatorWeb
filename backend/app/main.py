@@ -9,6 +9,7 @@ from app.api.auth_routes import router as auth_router
 from app.api.team_routes import router as team_router
 from app.api.invite_routes import router as invite_router
 from app.api.ws_routes import router as ws_router
+from app.api.bug_report_routes import router as bug_report_router
 
 
 @asynccontextmanager
@@ -50,6 +51,7 @@ app.include_router(auth_router)
 app.include_router(team_router)
 app.include_router(invite_router)
 app.include_router(ws_router)
+app.include_router(bug_report_router)
 
 
 @app.get("/health")

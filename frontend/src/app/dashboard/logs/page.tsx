@@ -61,7 +61,8 @@ export default function LogsPage() {
           <p className="text-muted-foreground">
             {connected
               ? "Live log stream from your OSR instance"
-              : "Logs will stream when an OSR instance connects"}
+              : "Logs will stream when an OSR instance connects"}{" "}
+            <span className="text-xs">— logs are live only and do not persist across restarts</span>
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -147,6 +148,12 @@ export default function LogsPage() {
             <div className="text-center text-sm text-muted-foreground py-8">
               No logs matching your filters.
             </div>
+          )}
+
+          {wsLogs.length >= 2000 && (
+            <p className="text-center text-xs text-muted-foreground pt-4 border-t mt-4">
+              Showing the most recent 2,000 log entries. Older entries are not retained in the live view.
+            </p>
           )}
         </CardContent>
       </Card>

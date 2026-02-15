@@ -229,6 +229,17 @@ export default function SettingsPage() {
                 <Badge variant="outline" className="ml-2 text-[10px]">
                   Hot-swappable
                 </Badge>
+                {!canManageContent && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant="secondary" className="ml-2 text-[10px] cursor-help">
+                        <Lock className="h-3 w-3 mr-0.5 inline" />
+                        Content Manager+
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>Only content managers and admins can edit these settings</TooltipContent>
+                  </Tooltip>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-1">
@@ -279,6 +290,17 @@ export default function SettingsPage() {
                 <Badge variant="outline" className="ml-2 text-[10px]">
                   Hot-swappable
                 </Badge>
+                {!canManageContent && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant="secondary" className="ml-2 text-[10px] cursor-help">
+                        <Lock className="h-3 w-3 mr-0.5 inline" />
+                        Content Manager+
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>Only content managers and admins can edit these settings</TooltipContent>
+                  </Tooltip>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-1">
@@ -333,6 +355,17 @@ export default function SettingsPage() {
                 <Badge variant="outline" className="ml-2 text-[10px]">
                   Hot-swappable
                 </Badge>
+                {!canManageContent && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant="secondary" className="ml-2 text-[10px] cursor-help">
+                        <Lock className="h-3 w-3 mr-0.5 inline" />
+                        Content Manager+
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>Only content managers and admins can edit these settings</TooltipContent>
+                  </Tooltip>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-1">

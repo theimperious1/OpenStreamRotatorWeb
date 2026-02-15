@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { useTeam, useMyRole } from "@/lib/team-context";
 import { useInstanceWs, type LogEntry } from "@/lib/instance-ws-context";
 import {
@@ -103,6 +104,7 @@ export default function DashboardPage() {
   })();
   const obsConnected = state?.obs_connected ?? instance?.obs_connected ?? false;
   const uptimeSeconds = state?.uptime_seconds ?? instance?.uptime_seconds ?? 0;
+  const connections = state?.connections;
 
   if (teamLoading) {
     return (
@@ -294,6 +296,42 @@ export default function DashboardPage() {
               connected={connected}
               tooltip={connected ? "OSR instance is connected and streaming state" : "OSR instance is not connected to the dashboard"}
             />
+            {connections && (
+              <>
+                <Separator />
+                <ConnectionBadge
+                  label={`Twitch${connections.twitch_enabled ? "" : " (disabled)"}`}
+                  connected={connections.twitch}
+                  tooltip={
+                    !connections.twitch_enabled
+                      ? "Twitch integration is disabled in settings"
+                      : connections.twitch
+                        ? "Twitch API credentials are configured"
+                        : "Twitch credentials not set — configure in Settings"
+                  }
+                />
+                <ConnectionBadge
+                  label={`Kick${connections.kick_enabled ? "" : " (disabled)"}`}
+                  connected={connections.kick}
+                  tooltip={
+                    !connections.kick_enabled
+                      ? "Kick integration is disabled in settings"
+                      : connections.kick
+                        ? "Kick API credentials are configured"
+                        : "Kick credentials not set — configure in Settings"
+                  }
+                />
+                <ConnectionBadge
+                  label="Discord Webhook"
+                  connected={connections.discord_webhook}
+                  tooltip={
+                    connections.discord_webhook
+                      ? "Discord webhook URL is configured for notifications"
+                      : "Discord webhook not set — configure in Settings"
+                  }
+                />
+              </>
+            )}
             {!instance && (
               <Tooltip>
                 <TooltipTrigger asChild>

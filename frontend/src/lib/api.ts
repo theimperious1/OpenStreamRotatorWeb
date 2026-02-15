@@ -21,6 +21,14 @@ export function getApiBase(): string {
   return resolveApiBase();
 }
 
+/** Returns the canonical site base URL for shareable links (e.g. invite URLs).
+ *  Uses NEXT_PUBLIC_SITE_URL env var if set, otherwise window.location.origin. */
+export function getSiteBase(): string {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  if (typeof window !== "undefined") return window.location.origin;
+  return "http://localhost:3000";
+}
+
 // ── Helpers ──────────────────────────────────
 
 function authHeaders(): HeadersInit {
@@ -126,6 +134,18 @@ export async function createTeam(name: string): Promise<Team> {
   return apiFetch<Team>("/teams", {
     method: "POST",
     body: JSON.stringify({ name }),
+  });
+}
+
+export async function deleteTeam(teamId: string): Promise<void> {
+  return apiFetch<void>(`/teams/${teamId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function leaveTeam(teamId: string): Promise<void> {
+  return apiFetch<void>(`/teams/${teamId}/leave`, {
+    method: "POST",
   });
 }
 
@@ -288,6 +308,22 @@ export async function getInviteInfo(code: string): Promise<InviteInfo> {
 export async function acceptInvite(code: string): Promise<TeamMember> {
   return apiFetch<TeamMember>(`/invites/${code}/accept`, {
     method: "POST",
+  });
+}
+
+// ── Bug Reports ──────────────────────────────
+
+export interface BugReport {
+  title: string;
+  description: string;
+  steps_to_reproduce?: string;
+  severity?: "low" | "medium" | "high" | "critical";
+}
+
+export async function submitBugReport(report: BugReport): Promise<{ ok: boolean; message: string }> {
+  return apiFetch<{ ok: boolean; message: string }>("/bug-reports", {
+    method: "POST",
+    body: JSON.stringify(report),
   });
 }
 

@@ -161,7 +161,7 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
           if (msg.type === "state") {
             setState(msg.data);
           } else if (msg.type === "log") {
-            setLogs((prev) => [msg.data, ...prev].slice(0, 1000));
+            setLogs((prev) => [msg.data, ...prev].slice(0, 2000));
           } else if (msg.type === "log_history") {
             // Batch of historical logs (oldest-first) sent on connect
             const history: LogEntry[] = Array.isArray(msg.data) ? msg.data : [];
@@ -169,7 +169,7 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
               // History is oldest-first, reverse for newest-first display
               const reversed = [...history].reverse();
               // Merge: history at the bottom, any live logs on top
-              return [...prev, ...reversed].slice(0, 1000);
+              return [...prev, ...reversed].slice(0, 2000);
             });
           } else if (msg.type === "command_ack") {
             const delivered = msg.data?.delivered ?? false;

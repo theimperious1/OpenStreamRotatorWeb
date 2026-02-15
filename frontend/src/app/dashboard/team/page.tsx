@@ -26,6 +26,9 @@ import {
   createInviteLink,
   listInviteLinks,
   revokeInviteLink,
+  deleteTeam,
+  leaveTeam,
+  getSiteBase,
   type TeamMember,
   type InviteLink,
 } from "@/lib/api";
@@ -45,6 +48,7 @@ import {
   Link,
   Clock,
   Ban,
+  LogOut,
 } from "lucide-react";
 import {
   Select,
@@ -81,7 +85,7 @@ const roleConfig = {
     label: "Moderator",
     color: "bg-green-500/10 text-green-500 border-green-500/20",
     icon: Shield,
-    description: "View status, skip videos, toggle debug mode",
+    description: "View status, skip videos, and pause/resume the stream",
   },
   viewer: {
     label: "Viewer",
@@ -186,7 +190,7 @@ export default function TeamPage() {
       const maxUses = parseInt(linkMaxUses, 10) || 0;
       const link = await createInviteLink(activeTeam.id, linkRole, maxUses, expiryHours);
       setInviteLinks((prev) => [link, ...prev]);
-      const url = `${window.location.origin}/invite/${link.code}`;
+      const url = `${getSiteBase()}/invite/${link.code}`;
       copyToClipboard(url);
       toast.success("Invite link created and copied to clipboard!");
     } catch {
@@ -210,7 +214,7 @@ export default function TeamPage() {
   }
 
   function handleCopyLink(code: string) {
-    const url = `${window.location.origin}/invite/${code}`;
+    const url = `${getSiteBase()}/invite/${code}`;
     copyToClipboard(url);
     setCopiedLink(code);
     toast.success("Invite link copied!");
@@ -262,6 +266,36 @@ export default function TeamPage() {
       await refresh();
     } catch {
       toast.error("Failed to rename instance");
+    }
+  }
+
+  async function handleLeaveTeam() {
+    if (!activeTeam) return;
+    const confirmed = window.confirm(
+      "Are you sure you want to leave this team? You will lose access to the dashboard."
+    );
+    if (!confirmed) return;
+    try {
+      await leaveTeam(activeTeam.id);
+      toast.success("Left team successfully");
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to leave team");
+    }
+  }
+
+  async function handleDeleteTeam() {
+    if (!activeTeam) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to delete \"${activeTeam.name}\"? This will permanently remove all members, instances, and invite links. This cannot be undone.`
+    );
+    if (!confirmed) return;
+    try {
+      await deleteTeam(activeTeam.id);
+      toast.success("Team deleted");
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete team");
     }
   }
 
@@ -778,6 +812,48 @@ export default function TeamPage() {
               );
             })}
           </div>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      {/* Danger Zone */}
+      <Card className="border-red-500/30">
+        <CardHeader>
+          <CardTitle className="text-base text-destructive">Danger Zone</CardTitle>
+          <CardDescription>
+            Irreversible actions — proceed with caution
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!isCreator && (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Leave Team</p>
+                <p className="text-xs text-muted-foreground">
+                  You will lose access to all team dashboards and data.
+                </p>
+              </div>
+              <Button variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleLeaveTeam}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Leave Team
+              </Button>
+            </div>
+          )}
+          {isCreator && (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Delete Team</p>
+                <p className="text-xs text-muted-foreground">
+                  Permanently delete this team, all members, instances, and invite links.
+                </p>
+              </div>
+              <Button variant="destructive" onClick={handleDeleteTeam}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Team
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

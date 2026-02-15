@@ -1,6 +1,6 @@
 """Invite link management endpoints."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -26,8 +26,11 @@ def _invite_is_valid(invite: TeamInvite) -> bool:
     """Check if an invite is still usable."""
     if invite.status != InviteStatus.pending:
         return False
-    if invite.expires_at and _utcnow() > invite.expires_at:
-        return False
+    if invite.expires_at:
+        # SQLite returns naive datetimes; ensure both sides are tz-aware for comparison
+        exp = invite.expires_at if invite.expires_at.tzinfo else invite.expires_at.replace(tzinfo=timezone.utc)
+        if _utcnow() > exp:
+            return False
     if invite.max_uses > 0 and invite.use_count >= invite.max_uses:
         return False
     return True

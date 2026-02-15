@@ -30,6 +30,19 @@ import {
   Lock,
 } from "lucide-react";
 import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { submitBugReport } from "@/lib/api";
+import { toast } from "sonner";
+import { Loader2, Bug, Send } from "lucide-react";
 
 interface FaqItem {
   question: string;
@@ -189,7 +202,7 @@ const features: FeatureItem[] = [
       "The team creator has full control and is the only one who can promote/demote admins.",
       "Admin role: Full control over all settings, credentials, team management, and instances.",
       "Content Manager: Can manage playlists, trigger rotations, adjust stream settings.",
-      "Moderator: Can view status, skip videos, toggle debug mode.",
+      "Moderator: Can view status, skip videos, and pause/resume the stream.",
       "Viewer: Read-only access to the dashboard and stream status.",
       "Invite Links let you generate shareable URLs with a preset role, optional expiry, and use limits.",
       "Instances represent connected OSR programs. Create one to get an API key for your .env file.",
@@ -348,7 +361,7 @@ export default function HelpPage() {
                   ["View logs & queue", true, true, true, true],
                   ["Watch stream preview", true, true, true, true],
                   ["Skip current video", true, true, true, false],
-                  ["Toggle debug mode", true, true, true, false],
+                  ["Toggle debug mode", true, true, false, false],
                   ["Manage playlists", true, true, false, false],
                   ["Trigger rotations", true, true, false, false],
                   ["Pause/resume stream", true, true, false, false],
@@ -441,6 +454,118 @@ export default function HelpPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Bug Report */}
+      <BugReportForm />
+    </div>
+  );
+}
+
+// ── Bug Report Form ──
+
+function BugReportForm() {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [steps, setSteps] = useState("");
+  const [severity, setSeverity] = useState<"low" | "medium" | "high" | "critical">("medium");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || !description.trim()) return;
+    setSubmitting(true);
+    try {
+      await submitBugReport({
+        title: title.trim(),
+        description: description.trim(),
+        steps_to_reproduce: steps.trim(),
+        severity,
+      });
+      toast.success("Bug report submitted! Thank you for your feedback.");
+      setTitle("");
+      setDescription("");
+      setSteps("");
+      setSeverity("medium");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to submit bug report");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold flex items-center gap-2">
+        <Bug className="h-5 w-5" />
+        Report a Bug
+      </h3>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Bug Report</CardTitle>
+          <CardDescription>
+            Found something broken? Fill out the form below and we&apos;ll look into it.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-[1fr_160px]">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Title</label>
+                <Input
+                  placeholder="Brief summary of the issue"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Severity</label>
+                <Select value={severity} onValueChange={(v) => setSeverity(v as typeof severity)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Description</label>
+              <Textarea
+                placeholder="What happened? What did you expect to happen?"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">
+                Steps to Reproduce{" "}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <Textarea
+                placeholder="1. Go to ...&#10;2. Click on ...&#10;3. See error"
+                value={steps}
+                onChange={(e) => setSteps(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <Button type="submit" disabled={submitting || !title.trim() || !description.trim()}>
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Submit Report
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

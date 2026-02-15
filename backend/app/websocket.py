@@ -22,7 +22,7 @@ from app.models import OSRInstance, InstanceStatus
 logger = logging.getLogger(__name__)
 
 # Maximum number of log entries cached per instance
-LOG_CACHE_SIZE = 500
+LOG_CACHE_SIZE = 2000
 
 
 class ConnectionManager:
