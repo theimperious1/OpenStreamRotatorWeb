@@ -5,9 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import { useTeam } from "@/lib/team-context";
+import { useMyRole } from "@/lib/team-context";
 import { useInstanceWs, type LogEntry } from "@/lib/instance-ws-context";
-import { Search, Filter, Loader2 } from "lucide-react";
+import { Search, Filter, Loader2, ShieldAlert } from "lucide-react";
 
 const levelColors: Record<LogEntry["level"], string> = {
   info: "bg-blue-500/10 text-blue-500 border-blue-500/20",
@@ -18,6 +24,7 @@ const levelColors: Record<LogEntry["level"], string> = {
 
 export default function LogsPage() {
   const { loading: teamLoading } = useTeam();
+  const { isViewOnly } = useMyRole();
   const { logs: wsLogs, connected } = useInstanceWs();
   const [filter, setFilter] = useState<LogEntry["level"] | "all">("all");
   const [search, setSearch] = useState("");
@@ -37,6 +44,15 @@ export default function LogsPage() {
     );
   }
 
+  if (isViewOnly) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+        <ShieldAlert className="h-10 w-10" />
+        <p className="text-sm">Logs are not available for the Viewer role.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -48,14 +64,19 @@ export default function LogsPage() {
               : "Logs will stream when an OSR instance connects"}
           </p>
         </div>
-        <Button variant="outline" size="sm" disabled>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           {connected && (
-            <Badge variant="outline" className="text-green-500 border-green-500/30 text-[10px] mr-2">
-              Live
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-green-500 border-green-500/30 cursor-help">
+                  Live
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>Real-time connection to OSR instance is active</TooltipContent>
+            </Tooltip>
           )}
           {logs.length} entries
-        </Button>
+        </div>
       </div>
 
       {/* Filters */}

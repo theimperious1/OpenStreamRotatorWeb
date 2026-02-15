@@ -42,6 +42,13 @@ def _require_role(membership: TeamMember, *allowed_roles: TeamRole) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
 
 
+def _redact_instance(instance: OSRInstance) -> InstanceOut:
+    """Return an InstanceOut with the api_key redacted."""
+    out = InstanceOut.model_validate(instance)
+    out.api_key = "••••••••"
+    return out
+
+
 # ──────────────────────────────────────────────
 # Team CRUD
 # ──────────────────────────────────────────────
@@ -53,7 +60,7 @@ async def create_team(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new team. The creator becomes the owner."""
-    team = Team(name=body.name)
+    team = Team(name=body.name, created_by=user.id)
     db.add(team)
     await db.flush()
 
@@ -85,7 +92,7 @@ async def get_team(
     db: AsyncSession = Depends(get_db),
 ):
     """Get full team details including members and instances."""
-    await _get_membership(db, team_id, user.id)
+    membership = await _get_membership(db, team_id, user.id)
 
     result = await db.execute(
         select(Team)
@@ -112,12 +119,19 @@ async def get_team(
         for m in team.members
     ]
 
+    # Only owners see full API keys
+    if membership.role == TeamRole.owner:
+        instances_out = [InstanceOut.model_validate(i) for i in team.instances]
+    else:
+        instances_out = [_redact_instance(i) for i in team.instances]
+
     return TeamDetailOut(
         id=team.id,
         name=team.name,
+        created_by=team.created_by,
         created_at=team.created_at,
         members=members_out,
-        instances=[InstanceOut.model_validate(i) for i in team.instances],
+        instances=instances_out,
     )
 
 
@@ -182,7 +196,7 @@ async def update_member_role(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update a team member's role. Owner only."""
+    """Update a team member's role. Owner only. Only the team creator can grant or revoke owner role."""
     my_membership = await _get_membership(db, team_id, user.id)
     _require_role(my_membership, TeamRole.owner)
 
@@ -193,6 +207,16 @@ async def update_member_role(
     target = result.scalar_one_or_none()
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+
+    # Only the team creator can grant or revoke owner role
+    if body.role == TeamRole.owner or target.role == TeamRole.owner:
+        team_result = await db.execute(select(Team).where(Team.id == team_id))
+        team = team_result.scalar_one()
+        if team.created_by != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the team creator can grant or revoke admin role",
+            )
 
     target.role = body.role
     await db.commit()
@@ -215,7 +239,7 @@ async def remove_member(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Remove a team member. Owner only. Cannot remove yourself."""
+    """Remove a team member. Owner only. Only the team creator can remove other owners."""
     my_membership = await _get_membership(db, team_id, user.id)
     _require_role(my_membership, TeamRole.owner)
 
@@ -227,6 +251,16 @@ async def remove_member(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
     if target.user_id == user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot remove yourself")
+
+    # Only the team creator can remove other owners
+    if target.role == TeamRole.owner:
+        team_result = await db.execute(select(Team).where(Team.id == team_id))
+        team = team_result.scalar_one()
+        if team.created_by != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the team creator can remove other owners",
+            )
 
     await db.delete(target)
     await db.commit()
@@ -303,6 +337,9 @@ async def update_instance_hls(
     instance.hls_url = url
     await db.commit()
     await db.refresh(instance)
+    # Content managers shouldn't see the API key
+    if membership.role != TeamRole.owner:
+        return _redact_instance(instance)
     return instance
 
 

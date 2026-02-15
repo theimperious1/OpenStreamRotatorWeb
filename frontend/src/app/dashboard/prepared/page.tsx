@@ -24,6 +24,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import { useTeam, useMyRole } from "@/lib/team-context";
 import {
   useInstanceWs,
@@ -466,12 +471,14 @@ export default function PreparedRotationsPage() {
         </div>
         <div className="flex items-center gap-2">
           {connected && (
-            <Badge
-              variant="outline"
-              className="text-green-500 border-green-500/20"
-            >
-              Live
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-green-500 border-green-500/30 cursor-help">
+                  Live
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>Real-time connection to OSR instance is active</TooltipContent>
+            </Tooltip>
           )}
           {hasCompleted && (
             <ActionButton

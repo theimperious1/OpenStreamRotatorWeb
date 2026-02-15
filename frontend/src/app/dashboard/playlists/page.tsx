@@ -20,15 +20,20 @@ import {
   ExternalLink,
   RefreshCw,
   Loader2,
-  CheckCircle2,
-  XCircle,
   ArrowUpDown,
   Check,
   Plus,
   Trash2,
   Pencil,
   X,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 
 // ── Helpers ──────────────────────────────────
 
@@ -351,32 +356,53 @@ function PlaylistCard({
             <button
               onClick={onToggle}
               disabled={!connected || !canControl}
-              title={playlist.enabled ? "Disable playlist" : "Enable playlist"}
-              className="hover:opacity-80 disabled:opacity-40"
+              className="hover:opacity-80 disabled:opacity-40 transition-colors"
             >
-              {playlist.enabled ? (
-                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-              ) : (
-                <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
-              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    {playlist.enabled ? (
+                      <ToggleRight className="h-7 w-7 text-green-500" />
+                    ) : (
+                      <ToggleLeft className="h-7 w-7 text-muted-foreground" />
+                    )}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{playlist.enabled ? "Playlist enabled — click to disable" : "Playlist disabled — click to enable"}</TooltipContent>
+              </Tooltip>
             </button>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-          <Badge variant="secondary" className="text-[10px]">
-            T: {playlist.twitch_category || "—"}
-          </Badge>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="secondary" className="text-[10px] cursor-help">
+                T: {playlist.twitch_category || "—"}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>Twitch stream category</TooltipContent>
+          </Tooltip>
           {playlist.kick_category && playlist.kick_category !== playlist.twitch_category && (
-            <Badge variant="secondary" className="text-[10px]">
-              K: {playlist.kick_category}
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="secondary" className="text-[10px] cursor-help">
+                  K: {playlist.kick_category}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>Kick stream category</TooltipContent>
+            </Tooltip>
           )}
-          <div className="flex items-center gap-1">
-            <ArrowUpDown className="h-3 w-3" />
-            <span>Priority {playlist.priority}</span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1 cursor-help">
+                <ArrowUpDown className="h-3 w-3" />
+                <span>Priority {playlist.priority}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>Higher priority playlists are preferred during rotation</TooltipContent>
+          </Tooltip>
         </div>
         <a
           href={playlist.url}
@@ -507,12 +533,17 @@ export default function PlaylistsPage() {
         </div>
         <div className="flex items-center gap-2">
           {connected && (
-            <Badge
-              variant="outline"
-              className="text-green-500 border-green-500/20"
-            >
-              Live
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className="text-green-500 border-green-500/30 cursor-help"
+                >
+                  Live
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>Real-time connection to OSR instance is active</TooltipContent>
+            </Tooltip>
           )}
           <Button
             variant="outline"

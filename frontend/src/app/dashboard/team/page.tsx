@@ -66,7 +66,7 @@ import {
 
 const roleConfig = {
   owner: {
-    label: "Owner",
+    label: "Admin",
     color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
     icon: Crown,
     description: "Full control — credentials, team management, all settings",
@@ -132,6 +132,7 @@ export default function TeamPage() {
   const members = activeTeam?.members ?? [];
   const myRole = members.find((m) => m.user_id === user?.id)?.role;
   const isOwner = myRole === "owner";
+  const isCreator = activeTeam?.created_by === user?.id;
   const canManageInvites = isOwner || myRole === "content_manager";
 
   // Auto-fetch invite links when team loads
@@ -375,21 +376,27 @@ export default function TeamPage() {
                       <p className="text-sm font-medium">{inst.name}</p>
                     )}
                     <div className="flex items-center gap-2 mt-1">
-                      <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono truncate max-w-[280px]">
-                        {inst.api_key}
-                      </code>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 flex-shrink-0"
-                        onClick={() => handleCopyKey(inst.api_key)}
-                      >
-                        {copiedKey === inst.api_key ? (
-                          <Check className="h-3 w-3 text-green-500" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                      </Button>
+                      {isOwner ? (
+                        <>
+                          <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono truncate max-w-[280px]">
+                            {inst.api_key}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 flex-shrink-0"
+                            onClick={() => handleCopyKey(inst.api_key)}
+                          >
+                            {copiedKey === inst.api_key ? (
+                              <Check className="h-3 w-3 text-green-500" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">API key hidden</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <Badge
@@ -509,7 +516,7 @@ export default function TeamPage() {
                     <SelectItem value="viewer">Viewer</SelectItem>
                     <SelectItem value="moderator">Moderator</SelectItem>
                     <SelectItem value="content_manager">Content Manager</SelectItem>
-                    {isOwner && <SelectItem value="owner">Owner</SelectItem>}
+                    {isOwner && <SelectItem value="owner">Admin</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -556,7 +563,7 @@ export default function TeamPage() {
             {/* Existing links */}
             {inviteLinks.length > 0 && (
               <div className="space-y-2">
-                {inviteLinks.map((link) => {
+                {inviteLinks.slice(0, 10).map((link) => {
                   const isActive = link.status === "pending";
                   const isExpired =
                     link.expires_at && new Date(link.expires_at) < new Date();
@@ -643,6 +650,11 @@ export default function TeamPage() {
                     </div>
                   );
                 })}
+                {inviteLinks.length > 10 && (
+                  <p className="text-xs text-muted-foreground text-center pt-1">
+                    {inviteLinks.length} total invites
+                  </p>
+                )}
               </div>
             )}
 
@@ -726,7 +738,7 @@ export default function TeamPage() {
                     </p>
                   </div>
 
-                  {isOwner && member.role !== "owner" && (
+                  {isOwner && member.user_id !== user?.id && (member.role !== "owner" || isCreator) && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -740,7 +752,7 @@ export default function TeamPage() {
                             Change Role
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent>
-                            {(["content_manager", "moderator", "viewer"] as const)
+                            {(isCreator ? ["owner", "content_manager", "moderator", "viewer"] as const : ["content_manager", "moderator", "viewer"] as const)
                               .filter((r) => r !== member.role)
                               .map((r) => (
                                 <DropdownMenuItem

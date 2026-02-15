@@ -18,6 +18,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import { useTeam, useMyRole } from "@/lib/team-context";
 import { updateInstanceHls, getInstanceViewers, sendPreviewHeartbeat } from "@/lib/api";
 import { toast } from "sonner";
@@ -265,12 +270,12 @@ export default function StreamPreviewPage() {
   // ── Status badge ──
   const statusConfig: Record<
     StreamStatus,
-    { label: string; variant: "default" | "destructive" | "secondary" | "outline" }
+    { label: string; variant: "default" | "destructive" | "secondary" | "outline"; tooltip: string }
   > = {
-    live: { label: "Live", variant: "default" },
-    loading: { label: "Connecting…", variant: "secondary" },
-    offline: { label: "Offline", variant: "destructive" },
-    "no-url": { label: "Not Configured", variant: "outline" },
+    live: { label: "Live", variant: "default", tooltip: "Stream is playing" },
+    loading: { label: "Connecting…", variant: "secondary", tooltip: "Connecting to the HLS stream" },
+    offline: { label: "Offline", variant: "destructive", tooltip: "Stream is offline or unreachable" },
+    "no-url": { label: "Not Configured", variant: "outline", tooltip: "No HLS stream URL has been set" },
   };
   const badge = statusConfig[hlsUrl ? streamStatus : "no-url"];
 
@@ -294,15 +299,20 @@ export default function StreamPreviewPage() {
               <span>{viewers}</span>
             </div>
           )}
-          <Badge variant={badge.variant} className="gap-1.5 text-xs">
-          {streamStatus === "live" && (
-            <Radio className="h-3 w-3 animate-pulse" />
-          )}
-          {streamStatus === "loading" && (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          )}
-          {badge.label}
-          </Badge>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant={badge.variant} className="gap-1.5 text-xs cursor-help">
+              {streamStatus === "live" && (
+                <Radio className="h-3 w-3 animate-pulse" />
+              )}
+              {streamStatus === "loading" && (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              )}
+              {badge.label}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>{badge.tooltip}</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
