@@ -35,6 +35,7 @@ class TeamCreate(BaseModel):
 class TeamOut(BaseModel):
     id: str
     name: str
+    created_by: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -54,6 +55,7 @@ class TeamMemberOut(BaseModel):
 class TeamDetailOut(BaseModel):
     id: str
     name: str
+    created_by: str | None = None
     created_at: datetime
     members: list[TeamMemberOut]
     instances: list["InstanceOut"]

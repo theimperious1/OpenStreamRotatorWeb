@@ -76,9 +76,11 @@ class Team(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     name: Mapped[str] = mapped_column(String(128))
+    created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     # Relationships
+    creator: Mapped["User | None"] = relationship()
     members: Mapped[list["TeamMember"]] = relationship(back_populates="team", cascade="all, delete-orphan")
     instances: Mapped[list["OSRInstance"]] = relationship(back_populates="team", cascade="all, delete-orphan")
     invites: Mapped[list["TeamInvite"]] = relationship(back_populates="team", cascade="all, delete-orphan")

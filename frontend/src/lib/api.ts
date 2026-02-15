@@ -68,6 +68,7 @@ export interface User {
 export interface Team {
   id: string;
   name: string;
+  created_by: string | null;
   created_at: string;
 }
 

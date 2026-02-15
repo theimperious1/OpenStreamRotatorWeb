@@ -31,8 +31,8 @@ class ConnectionManager:
     def __init__(self):
         # instance_id → WebSocket (one OSR instance per connection)
         self.osr_connections: dict[str, WebSocket] = {}
-        # instance_id → set of browser WebSockets
-        self.browser_connections: dict[str, set[WebSocket]] = {}
+        # instance_id → dict of {WebSocket: role_str}
+        self.browser_connections: dict[str, dict[WebSocket, str]] = {}
         # instance_id → latest state snapshot (for new browser connections)
         self.state_cache: dict[str, dict] = {}
         # instance_id → ring buffer of recent log entries
@@ -66,45 +66,51 @@ class ConnectionManager:
 
     # ── Browser connections ──
 
-    async def connect_browser(self, instance_id: str, websocket: WebSocket):
+    async def connect_browser(self, instance_id: str, websocket: WebSocket, role: str = "viewer"):
         await websocket.accept()
         if instance_id not in self.browser_connections:
-            self.browser_connections[instance_id] = set()
-        self.browser_connections[instance_id].add(websocket)
-        logger.info(f"Browser subscribed to instance {instance_id}")
+            self.browser_connections[instance_id] = {}
+        self.browser_connections[instance_id][websocket] = role
+        logger.info(f"Browser subscribed to instance {instance_id} (role={role})")
 
         # Send cached state immediately so the UI populates without waiting
         cached = self.state_cache.get(instance_id)
         if cached:
             await websocket.send_json({"type": "state", "data": cached})
 
-        # Send cached log entries so newly-connected browsers have history
-        cached_logs = self.log_cache.get(instance_id)
-        if cached_logs:
-            # Send oldest-first as a batch so the frontend can prepend them
-            await websocket.send_json({
-                "type": "log_history",
-                "data": list(cached_logs),
-            })
+        # Send cached log entries (skip for viewers)
+        if role != "viewer":
+            cached_logs = self.log_cache.get(instance_id)
+            if cached_logs:
+                # Send oldest-first as a batch so the frontend can prepend them
+                await websocket.send_json({
+                    "type": "log_history",
+                    "data": list(cached_logs),
+                })
 
     def disconnect_browser(self, instance_id: str, websocket: WebSocket):
         subs = self.browser_connections.get(instance_id)
         if subs:
-            subs.discard(websocket)
+            subs.pop(websocket, None)
             if not subs:
                 del self.browser_connections[instance_id]
 
-    async def broadcast_to_browsers(self, instance_id: str, message: dict):
-        """Send a message to all browsers watching this instance."""
-        subs = self.browser_connections.get(instance_id, set())
+    async def broadcast_to_browsers(self, instance_id: str, message: dict, exclude_roles: set[str] | None = None):
+        """Send a message to all browsers watching this instance.
+        
+        If exclude_roles is provided, skip connections with those roles.
+        """
+        subs = self.browser_connections.get(instance_id, {})
         dead = []
-        for ws in subs:
+        for ws, role in subs.items():
+            if exclude_roles and role in exclude_roles:
+                continue
             try:
                 await ws.send_json(message)
             except Exception:
                 dead.append(ws)
         for ws in dead:
-            subs.discard(ws)
+            subs.pop(ws, None)
 
     # ── State management ──
 
@@ -132,13 +138,16 @@ class ConnectionManager:
         await self.broadcast_to_browsers(instance_id, {"type": "state", "data": state})
 
     async def handle_log_entry(self, instance_id: str, log: dict):
-        """Forward a log entry from OSR to subscribed browsers and cache it."""
+        """Forward a log entry from OSR to subscribed browsers and cache it.
+        
+        Viewers are excluded — they don't have access to logs.
+        """
         # Cache for future browser connections
         if instance_id not in self.log_cache:
             self.log_cache[instance_id] = deque(maxlen=LOG_CACHE_SIZE)
         self.log_cache[instance_id].append(log)
 
-        await self.broadcast_to_browsers(instance_id, {"type": "log", "data": log})
+        await self.broadcast_to_browsers(instance_id, {"type": "log", "data": log}, exclude_roles={"viewer"})
 
 
 # Singleton

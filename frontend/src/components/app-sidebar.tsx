@@ -15,6 +15,7 @@ import {
   Server,
   ChevronDown,
   Tv,
+  HelpCircle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -33,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { useTeam } from "@/lib/team-context";
+import { useMyRole } from "@/lib/team-context";
 import {
   Select,
   SelectContent,
@@ -50,18 +52,23 @@ const navItems = [
   { title: "Preview", href: "/dashboard/preview", icon: Tv },
   { title: "Team", href: "/dashboard/team", icon: Users },
   { title: "Settings", href: "/dashboard/settings", icon: Settings },
+  { title: "Help", href: "/dashboard/help", icon: HelpCircle },
 ];
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { activeTeam, activeInstance, selectInstance } = useTeam();
+  const { isViewOnly } = useMyRole();
 
   const instances = activeTeam?.instances ?? [];
   const instance = activeInstance;
   const isOnline = instance?.status === "online";
   const isPaused = instance?.status === "paused";
-  const multipleInstances = instances.length > 1;
+
+  const filteredNavItems = isViewOnly
+    ? navItems.filter((item) => item.href !== "/dashboard/logs")
+    : navItems;
 
   return (
     <Sidebar>
@@ -84,7 +91,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {filteredNavItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild

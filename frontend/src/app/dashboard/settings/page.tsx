@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -16,6 +16,11 @@ import { useTeam, useMyRole } from "@/lib/team-context";
 import { useInstanceWs } from "@/lib/instance-ws-context";
 import type { OsrSettings, EnvConfig } from "@/lib/instance-ws-context";
 import { Save, Loader2, Eye, EyeOff, Lock } from "lucide-react";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 
 function SettingRow({
   label,
@@ -72,7 +77,7 @@ export default function SettingsPage() {
   const [dirty, setDirty] = useState(false);
   const [envDraft, setEnvDraft] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
-  const skipNextSync = useRef(false);
+  const [skipNextSync, setSkipNextSync] = useState(false);
 
   const updateEnvDraft = useCallback((key: string, value: string) => {
     setEnvDraft((prev) => ({ ...prev, [key]: value }));
@@ -80,23 +85,24 @@ export default function SettingsPage() {
 
   const anyDirty = !saving && (dirty || Object.keys(envDraft).length > 0);
 
-  // Sync remote settings into local draft when they first arrive or change.
-  // After a save we skip one cycle so stale remote data doesn't overwrite the
-  // draft. The NEXT state push (with server-confirmed values) syncs normally.
-  useEffect(() => {
+  // Sync remote settings into local draft when they change (render-time
+  // adjustment – avoids cascading effects).  After a save we skip one cycle so
+  // stale remote data doesn't overwrite the draft.
+  const [prevRemote, setPrevRemote] = useState(remoteSettings);
+  if (remoteSettings !== prevRemote) {
+    setPrevRemote(remoteSettings);
     if (remoteSettings && !dirty) {
-      if (skipNextSync.current) {
-        skipNextSync.current = false;
-        return;
-      }
-      setDraft(remoteSettings);
-      // Also clear any pending env edits & saving flag — remote has caught up
-      if (saving) {
-        setEnvDraft({});
-        setSaving(false);
+      if (skipNextSync) {
+        setSkipNextSync(false);
+      } else {
+        setDraft(remoteSettings);
+        if (saving) {
+          setEnvDraft({});
+          setSaving(false);
+        }
       }
     }
-  }, [remoteSettings, dirty, saving]);
+  }
 
   const updateDraft = useCallback(
     (key: keyof OsrSettings, value: OsrSettings[keyof OsrSettings]) => {
@@ -128,7 +134,7 @@ export default function SettingsPage() {
     for (const [key, value] of Object.entries(envDraft)) {
       sendCommand("update_env", { key, value });
     }
-    skipNextSync.current = true;
+    setSkipNextSync(true);
     setSaving(true);
     setDirty(false);
     // envDraft is NOT cleared here — keeps merged config showing pending values
@@ -150,19 +156,29 @@ export default function SettingsPage() {
         </div>
         <div className="flex items-center gap-2">
           {connected ? (
-            <Badge
-              variant="outline"
-              className="text-green-500 border-green-500/20"
-            >
-              Connected
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className="text-green-500 border-green-500/30 cursor-help"
+                >
+                  Connected
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>Real-time connection to OSR instance is active</TooltipContent>
+            </Tooltip>
           ) : (
-            <Badge
-              variant="outline"
-              className="text-gray-500 border-gray-500/20"
-            >
-              Disconnected
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className="text-gray-500 border-gray-500/20 cursor-help"
+                >
+                  Disconnected
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>No OSR instance is connected</TooltipContent>
+            </Tooltip>
           )}
           {lastAck && !lastAck.delivered && (
             <Badge
@@ -384,10 +400,8 @@ export default function SettingsPage() {
             connections={connections}
             connected={connected}
             isOwner={isOwner}
-            canManageContent={canManageContent}
             envDraft={envDraft}
             onEnvChange={updateEnvDraft}
-            sendCommand={sendCommand}
           />
         </>
       )}
@@ -402,19 +416,15 @@ function EnvironmentSection({
   connections,
   connected,
   isOwner,
-  canManageContent,
   envDraft,
   onEnvChange,
-  sendCommand,
 }: {
   envConfig?: EnvConfig;
   connections?: { obs: boolean; twitch: boolean; kick: boolean; discord_webhook: boolean; twitch_enabled: boolean; kick_enabled: boolean };
   connected: boolean;
   isOwner: boolean;
-  canManageContent: boolean;
   envDraft: Record<string, string>;
   onEnvChange: (key: string, value: string) => void;
-  sendCommand: (action: string, payload?: Record<string, unknown>) => void;
 }) {
   const sendEnv = onEnvChange;
 
@@ -443,10 +453,15 @@ function EnvironmentSection({
               <CardDescription>
                 OBS WebSocket connection and scene names
                 {!isOwner && (
-                  <Badge variant="secondary" className="ml-2 text-[10px]">
-                    <Lock className="h-3 w-3 mr-0.5 inline" />
-                    Owner only
-                  </Badge>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant="secondary" className="ml-2 text-[10px] cursor-help">
+                        <Lock className="h-3 w-3 mr-0.5 inline" />
+                        Admin only
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>Only team admins can edit these settings</TooltipContent>
+                  </Tooltip>
                 )}
               </CardDescription>
             </div>
@@ -538,10 +553,15 @@ function EnvironmentSection({
               <CardDescription>
                 Twitch API credentials and live detection
                 {!isOwner && (
-                  <Badge variant="secondary" className="ml-2 text-[10px]">
-                    <Lock className="h-3 w-3 mr-0.5 inline" />
-                    Owner only
-                  </Badge>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant="secondary" className="ml-2 text-[10px] cursor-help">
+                        <Lock className="h-3 w-3 mr-0.5 inline" />
+                        Admin only
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>Only team admins can edit these settings</TooltipContent>
+                  </Tooltip>
                 )}
               </CardDescription>
             </div>
@@ -599,10 +619,15 @@ function EnvironmentSection({
               <CardDescription>
                 Kick API credentials and live detection
                 {!isOwner && (
-                  <Badge variant="secondary" className="ml-2 text-[10px]">
-                    <Lock className="h-3 w-3 mr-0.5 inline" />
-                    Owner only
-                  </Badge>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant="secondary" className="ml-2 text-[10px] cursor-help">
+                        <Lock className="h-3 w-3 mr-0.5 inline" />
+                        Admin only
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>Only team admins can edit these settings</TooltipContent>
+                  </Tooltip>
                 )}
               </CardDescription>
             </div>
@@ -660,10 +685,15 @@ function EnvironmentSection({
               <CardDescription>
                 Webhook for notifications
                 {!isOwner && (
-                  <Badge variant="secondary" className="ml-2 text-[10px]">
-                    <Lock className="h-3 w-3 mr-0.5 inline" />
-                    Owner only
-                  </Badge>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant="secondary" className="ml-2 text-[10px] cursor-help">
+                        <Lock className="h-3 w-3 mr-0.5 inline" />
+                        Admin only
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>Only team admins can edit these settings</TooltipContent>
+                  </Tooltip>
                 )}
               </CardDescription>
             </div>
@@ -716,12 +746,14 @@ function EnvRow({
   const [editing, setEditing] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
 
-  // Sync from remote when not editing
-  useEffect(() => {
+  // Sync from remote when not editing (render-time adjustment)
+  const [prevRemoteValue, setPrevRemoteValue] = useState(remoteValue);
+  if (remoteValue !== prevRemoteValue) {
+    setPrevRemoteValue(remoteValue);
     if (!editing && !isSecret) {
       setLocalValue(remoteValue);
     }
-  }, [remoteValue, editing, isSecret]);
+  }
 
   const handleSave = useCallback(() => {
     if (disabled) return;

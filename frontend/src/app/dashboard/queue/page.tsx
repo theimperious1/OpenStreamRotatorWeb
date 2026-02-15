@@ -21,6 +21,11 @@ import {
   RefreshCw,
   Check,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 
 /** Button that shows brief "Sent!" feedback after click. */
 function CommandButton({
@@ -105,29 +110,44 @@ export default function QueuePage() {
         </div>
         <div className="flex items-center gap-2">
           {connected && (
-            <Badge
-              variant="outline"
-              className="text-green-500 border-green-500/20"
-            >
-              Live
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className="text-green-500 border-green-500/20 cursor-help"
+                >
+                  Live
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>Connected to OSR instance in real-time</TooltipContent>
+            </Tooltip>
           )}
           {downloadActive && (
-            <Badge
-              variant="outline"
-              className="text-blue-500 border-blue-500/20"
-            >
-              <Download className="h-3 w-3 mr-1" />
-              Downloading
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className="text-blue-500 border-blue-500/20 cursor-help"
+                >
+                  <Download className="h-3 w-3 mr-1" />
+                  Downloading
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>A video is currently being downloaded</TooltipContent>
+            </Tooltip>
           )}
           {lastAck && !lastAck.delivered && (
-            <Badge
-              variant="outline"
-              className="text-red-500 border-red-500/20"
-            >
-              OSR Unreachable
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className="text-red-500 border-red-500/20 cursor-help"
+                >
+                  OSR Unreachable
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>Last command could not be delivered to the OSR instance</TooltipContent>
+            </Tooltip>
           )}
           <CommandButton
             label="Skip Current"
@@ -216,9 +236,19 @@ export default function QueuePage() {
                       {i + 1}
                     </span>
                     {isCurrent ? (
-                      <PlayCircle className="h-4 w-4 text-primary flex-shrink-0" />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <PlayCircle className="h-4 w-4 text-primary flex-shrink-0 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>Currently playing</TooltipContent>
+                      </Tooltip>
                     ) : (
-                      <FileVideo className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <FileVideo className="h-4 w-4 text-muted-foreground flex-shrink-0 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>Queued for playback</TooltipContent>
+                      </Tooltip>
                     )}
                     <span
                       className={`truncate ${

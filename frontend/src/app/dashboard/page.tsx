@@ -22,6 +22,11 @@ import {
   Play,
   Pause,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 
 function formatUptime(seconds: number): string {
   const d = Math.floor(seconds / 86400);
@@ -37,11 +42,13 @@ function formatUptime(seconds: number): string {
 function ConnectionBadge({
   label,
   connected,
+  tooltip,
 }: {
   label: string;
   connected: boolean;
+  tooltip?: string;
 }) {
-  return (
+  const content = (
     <div className="flex items-center gap-1.5">
       {connected ? (
         <Wifi className="h-3.5 w-3.5 text-green-500" />
@@ -50,6 +57,15 @@ function ConnectionBadge({
       )}
       <span className="text-sm">{label}</span>
     </div>
+  );
+
+  if (!tooltip) return content;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{content}</TooltipTrigger>
+      <TooltipContent side="right">{tooltip}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -188,9 +204,14 @@ export default function DashboardPage() {
               </Button>
             )}
             {connected && (
-              <Badge variant="outline" className="text-green-500 border-green-500/30 text-[10px]">
-                Live
-              </Badge>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="text-green-500 border-green-500/30 cursor-help">
+                    Live
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>Real-time connection to OSR instance is active</TooltipContent>
+              </Tooltip>
             )}
           </div>
         </CardContent>
@@ -201,7 +222,12 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Now Playing</CardTitle>
-            <PlayCircle className="h-4 w-4 text-muted-foreground" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PlayCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent>The video currently playing on the stream</TooltipContent>
+            </Tooltip>
           </CardHeader>
           <CardContent>
             <div className="text-sm font-bold truncate">{currentVideo}</div>
@@ -214,7 +240,12 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Category</CardTitle>
-            <Monitor className="h-4 w-4 text-muted-foreground" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Monitor className="h-4 w-4 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent>Stream category on Twitch/Kick — auto-updated per video</TooltipContent>
+            </Tooltip>
           </CardHeader>
           <CardContent>
             <div className="text-sm font-bold">{currentCategory}</div>
@@ -227,7 +258,12 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Uptime</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Clock className="h-4 w-4 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent>How long OSR has been running since last restart</TooltipContent>
+            </Tooltip>
           </CardHeader>
           <CardContent>
             <div className="text-sm font-bold">
@@ -248,15 +284,28 @@ export default function DashboardPage() {
             <CardDescription>Service connectivity status</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <ConnectionBadge label="OBS WebSocket" connected={obsConnected} />
-            <ConnectionBadge label="Web Dashboard" connected={connected} />
+            <ConnectionBadge
+              label="OBS WebSocket"
+              connected={obsConnected}
+              tooltip={obsConnected ? "Connected to OBS via WebSocket" : "OBS WebSocket is disconnected — check OBS settings"}
+            />
+            <ConnectionBadge
+              label="Web Dashboard"
+              connected={connected}
+              tooltip={connected ? "OSR instance is connected and streaming state" : "OSR instance is not connected to the dashboard"}
+            />
             {!instance && (
-              <div className="flex items-center gap-1.5 pt-2 border-t">
-                <AlertCircle className="h-3.5 w-3.5 text-yellow-500" />
-                <span className="text-sm text-yellow-500">
-                  No OSR instance registered
-                </span>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5 pt-2 border-t cursor-help">
+                    <AlertCircle className="h-3.5 w-3.5 text-yellow-500" />
+                    <span className="text-sm text-yellow-500">
+                      No OSR instance registered
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>Create an OSR instance on the Team page to connect your stream</TooltipContent>
+              </Tooltip>
             )}
           </CardContent>
         </Card>
