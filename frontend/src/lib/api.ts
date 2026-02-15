@@ -93,6 +93,7 @@ export interface Instance {
   current_category: string | null;
   obs_connected: boolean;
   uptime_seconds: number;
+  hls_url: string | null;
 }
 
 export interface TeamDetail extends Team {
@@ -190,6 +191,39 @@ export async function renameInstance(
     method: "PATCH",
     body: JSON.stringify({ name }),
   });
+}
+
+export async function updateInstanceHls(
+  teamId: string,
+  instanceId: string,
+  hlsUrl: string | null
+): Promise<Instance> {
+  return apiFetch<Instance>(
+    `/teams/${teamId}/instances/${instanceId}/hls`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ hls_url: hlsUrl }),
+    }
+  );
+}
+
+export async function getInstanceViewers(
+  teamId: string,
+  instanceId: string
+): Promise<{ viewers: number | null }> {
+  return apiFetch<{ viewers: number | null }>(
+    `/teams/${teamId}/instances/${instanceId}/viewers`
+  );
+}
+
+export async function sendPreviewHeartbeat(
+  teamId: string,
+  instanceId: string
+): Promise<void> {
+  return apiFetch<void>(
+    `/teams/${teamId}/instances/${instanceId}/viewers/heartbeat`,
+    { method: "POST" }
+  );
 }
 
 // ── Invite Links ─────────────────────────────

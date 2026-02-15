@@ -14,6 +14,7 @@ import {
   FolderClock,
   Server,
   ChevronDown,
+  Tv,
 } from "lucide-react";
 import {
   Sidebar,
@@ -46,6 +47,7 @@ const navItems = [
   { title: "Queue", href: "/dashboard/queue", icon: PlayCircle },
   { title: "Prepared", href: "/dashboard/prepared", icon: FolderClock },
   { title: "Logs", href: "/dashboard/logs", icon: ScrollText },
+  { title: "Preview", href: "/dashboard/preview", icon: Tv },
   { title: "Team", href: "/dashboard/team", icon: Users },
   { title: "Settings", href: "/dashboard/settings", icon: Settings },
 ];

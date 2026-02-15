@@ -140,6 +140,7 @@ class OSRInstance(Base):
     current_category: Mapped[str | None] = mapped_column(String(256), nullable=True)
     obs_connected: Mapped[bool] = mapped_column(Boolean, default=False)
     uptime_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    hls_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationships
     team: Mapped["Team"] = relationship(back_populates="instances")

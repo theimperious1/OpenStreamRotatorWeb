@@ -118,6 +118,11 @@ class InstanceRename(BaseModel):
     name: str
 
 
+class InstanceUpdate(BaseModel):
+    name: str | None = None
+    hls_url: str | None = None
+
+
 class InstanceOut(BaseModel):
     id: str
     team_id: str
@@ -131,6 +136,7 @@ class InstanceOut(BaseModel):
     current_category: str | None
     obs_connected: bool
     uptime_seconds: int
+    hls_url: str | None = None
 
     model_config = {"from_attributes": True}
 

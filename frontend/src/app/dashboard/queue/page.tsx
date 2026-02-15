@@ -64,9 +64,8 @@ function CommandButton({
 }
 
 export default function QueuePage() {
-  const { activeTeam, activeInstance, loading: teamLoading } = useTeam();
+  const { activeInstance: instance, loading: teamLoading } = useTeam();
   const { canControl } = useMyRole();
-  const instance = activeInstance;
   const { state, sendCommand, connected, lastAck } = useInstanceWs();
 
   const currentVideo = state?.current_video ?? instance?.current_video;

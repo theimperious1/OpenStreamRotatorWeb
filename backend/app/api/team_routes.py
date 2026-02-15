@@ -1,5 +1,6 @@
 """Team management endpoints."""
 
+import time
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +11,7 @@ from app.models import User, Team, TeamMember, TeamRole, OSRInstance
 from app.schemas import (
     TeamCreate, TeamOut, TeamDetailOut, TeamMemberOut,
     RoleUpdate, InviteCreate,
-    InstanceCreate, InstanceRename, InstanceOut,
+    InstanceCreate, InstanceRename, InstanceUpdate, InstanceOut,
 )
 from app.auth import get_current_user
 
@@ -278,6 +279,33 @@ async def rename_instance(
     return instance
 
 
+@router.put("/{team_id}/instances/{instance_id}/hls", response_model=InstanceOut)
+async def update_instance_hls(
+    team_id: str,
+    instance_id: str,
+    body: InstanceUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Set or clear the HLS preview URL for an OSR instance. Owner or content_manager."""
+    membership = await _get_membership(db, team_id, user.id)
+    _require_role(membership, TeamRole.owner, TeamRole.content_manager)
+
+    result = await db.execute(
+        select(OSRInstance).where(OSRInstance.id == instance_id, OSRInstance.team_id == team_id)
+    )
+    instance = result.scalar_one_or_none()
+    if instance is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Instance not found")
+
+    # Allow clearing with empty string or null
+    url = (body.hls_url or "").strip() or None
+    instance.hls_url = url
+    await db.commit()
+    await db.refresh(instance)
+    return instance
+
+
 @router.delete("/{team_id}/instances/{instance_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_instance(
     team_id: str,
@@ -298,3 +326,67 @@ async def delete_instance(
 
     await db.delete(instance)
     await db.commit()
+
+
+# ──────────────────────────────────────────────
+# Preview viewer tracking (heartbeat-based)
+# ──────────────────────────────────────────────
+
+# Dict of instance_id → dict of user_id → last_heartbeat_timestamp
+_preview_watchers: dict[str, dict[str, float]] = {}
+_HEARTBEAT_TTL = 20.0  # seconds — clients heartbeat every 10s, expire after 20s
+
+
+def _count_active_watchers(instance_id: str) -> int:
+    """Count watchers whose heartbeat is within the TTL."""
+    watchers = _preview_watchers.get(instance_id)
+    if not watchers:
+        return 0
+    now = time.monotonic()
+    # Clean up expired entries while counting
+    expired = [uid for uid, ts in watchers.items() if now - ts > _HEARTBEAT_TTL]
+    for uid in expired:
+        del watchers[uid]
+    return len(watchers)
+
+
+@router.post("/{team_id}/instances/{instance_id}/viewers/heartbeat")
+async def preview_heartbeat(
+    team_id: str,
+    instance_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Record that a user is actively watching the preview. Called every ~10s by the frontend."""
+    await _get_membership(db, team_id, user.id)
+
+    result = await db.execute(
+        select(OSRInstance.id).where(OSRInstance.id == instance_id, OSRInstance.team_id == team_id)
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Instance not found")
+
+    if instance_id not in _preview_watchers:
+        _preview_watchers[instance_id] = {}
+    _preview_watchers[instance_id][user.id] = time.monotonic()
+
+    return {"ok": True}
+
+
+@router.get("/{team_id}/instances/{instance_id}/viewers")
+async def get_instance_viewers(
+    team_id: str,
+    instance_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return how many users are actively watching the preview stream."""
+    await _get_membership(db, team_id, user.id)
+
+    result = await db.execute(
+        select(OSRInstance.id).where(OSRInstance.id == instance_id, OSRInstance.team_id == team_id)
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Instance not found")
+
+    return {"viewers": _count_active_watchers(instance_id)}

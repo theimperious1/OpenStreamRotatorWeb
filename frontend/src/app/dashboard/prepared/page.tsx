@@ -405,14 +405,12 @@ function PreparedRotationCard({
 // ── Main page ────────────────────────────────
 
 export default function PreparedRotationsPage() {
-  const { activeTeam, activeInstance, loading: teamLoading } = useTeam();
+  const { loading: teamLoading } = useTeam();
   const { canManageContent } = useMyRole();
-  const instance = activeInstance;
   const { state, sendCommand, connected } = useInstanceWs();
 
   const preparedRotations = state?.prepared_rotations ?? [];
   const anyDownloading = state?.any_downloading ?? false;
-  const playlists = state?.playlists ?? [];
   const settings = state?.settings;
 
   const minPlaylists = settings?.min_playlists_per_rotation ?? 2;
@@ -424,8 +422,8 @@ export default function PreparedRotationsPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   const enabledPlaylists = useMemo(
-    () => playlists.filter((p) => p.enabled),
-    [playlists]
+    () => (state?.playlists ?? []).filter((p) => p.enabled),
+    [state?.playlists]
   );
 
   const togglePlaylist = useCallback((name: string) => {
