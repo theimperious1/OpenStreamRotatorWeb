@@ -440,9 +440,9 @@ function PlaylistCard({
 // ── Page ─────────────────────────────────────
 
 export default function PlaylistsPage() {
-  const { activeTeam, loading: teamLoading } = useTeam();
+  const { activeTeam, activeInstance, loading: teamLoading } = useTeam();
   const { canControl, canManageContent } = useMyRole();
-  const instance = activeTeam?.instances?.[0] ?? null;
+  const instance = activeInstance;
   const { state, sendCommand, connected } = useInstanceWs();
 
   const playlists = state?.playlists ?? [];

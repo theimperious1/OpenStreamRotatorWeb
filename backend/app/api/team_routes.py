@@ -10,7 +10,7 @@ from app.models import User, Team, TeamMember, TeamRole, OSRInstance
 from app.schemas import (
     TeamCreate, TeamOut, TeamDetailOut, TeamMemberOut,
     RoleUpdate, InviteCreate,
-    InstanceCreate, InstanceOut,
+    InstanceCreate, InstanceRename, InstanceOut,
 )
 from app.auth import get_current_user
 
@@ -248,6 +248,31 @@ async def create_instance(
 
     instance = OSRInstance(team_id=team_id, name=body.name)
     db.add(instance)
+    await db.commit()
+    await db.refresh(instance)
+    return instance
+
+
+@router.patch("/{team_id}/instances/{instance_id}", response_model=InstanceOut)
+async def rename_instance(
+    team_id: str,
+    instance_id: str,
+    body: InstanceRename,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Rename an OSR instance. Owner only."""
+    membership = await _get_membership(db, team_id, user.id)
+    _require_role(membership, TeamRole.owner)
+
+    result = await db.execute(
+        select(OSRInstance).where(OSRInstance.id == instance_id, OSRInstance.team_id == team_id)
+    )
+    instance = result.scalar_one_or_none()
+    if instance is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Instance not found")
+
+    instance.name = body.name
     await db.commit()
     await db.refresh(instance)
     return instance

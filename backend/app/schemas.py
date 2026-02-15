@@ -114,6 +114,10 @@ class InstanceCreate(BaseModel):
     name: str = "Default Instance"
 
 
+class InstanceRename(BaseModel):
+    name: str
+
+
 class InstanceOut(BaseModel):
     id: str
     team_id: str

@@ -68,9 +68,9 @@ function LogLevelBadge({ level }: { level: LogEntry["level"] }) {
 }
 
 export default function DashboardPage() {
-  const { activeTeam, loading: teamLoading } = useTeam();
+  const { activeTeam, activeInstance, loading: teamLoading } = useTeam();
   const { canControl } = useMyRole();
-  const instance = activeTeam?.instances?.[0] ?? null;
+  const instance = activeInstance;
   const { state, logs, connected, sendCommand } = useInstanceWs();
 
   // Merge WebSocket live state with the DB snapshot from the team detail

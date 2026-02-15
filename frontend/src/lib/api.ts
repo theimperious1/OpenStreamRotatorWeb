@@ -181,6 +181,17 @@ export async function deleteInstance(
   });
 }
 
+export async function renameInstance(
+  teamId: string,
+  instanceId: string,
+  name: string
+): Promise<Instance> {
+  return apiFetch<Instance>(`/teams/${teamId}/instances/${instanceId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+}
+
 // ── Invite Links ─────────────────────────────
 
 export interface InviteLink {

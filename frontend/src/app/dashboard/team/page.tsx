@@ -22,6 +22,7 @@ import {
   removeMember,
   createInstance,
   deleteInstance,
+  renameInstance,
   createInviteLink,
   listInviteLinks,
   revokeInviteLink,
@@ -100,6 +101,8 @@ export default function TeamPage() {
   const [instanceName, setInstanceName] = useState("");
   const [creatingInstance, setCreatingInstance] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [editingInstanceId, setEditingInstanceId] = useState<string | null>(null);
+  const [editingInstanceName, setEditingInstanceName] = useState("");
 
   // Invite link state
   const [inviteLinks, setInviteLinks] = useState<InviteLink[]>([]);
@@ -249,6 +252,18 @@ export default function TeamPage() {
     setTimeout(() => setCopiedKey(null), 2000);
   }
 
+  async function handleRenameInstance(instanceId: string) {
+    if (!activeTeam || !editingInstanceName.trim()) return;
+    try {
+      await renameInstance(activeTeam.id, instanceId, editingInstanceName.trim());
+      setEditingInstanceId(null);
+      setEditingInstanceName("");
+      await refresh();
+    } catch {
+      toast.error("Failed to rename instance");
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -337,7 +352,28 @@ export default function TeamPage() {
                 >
                   <Server className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{inst.name}</p>
+                    {editingInstanceId === inst.id ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={editingInstanceName}
+                          onChange={(e) => setEditingInstanceName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleRenameInstance(inst.id);
+                            if (e.key === "Escape") { setEditingInstanceId(null); setEditingInstanceName(""); }
+                          }}
+                          className="h-7 text-sm max-w-[200px]"
+                          autoFocus
+                        />
+                        <Button size="sm" className="h-7 text-xs" onClick={() => handleRenameInstance(inst.id)}>
+                          Save
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setEditingInstanceId(null); setEditingInstanceName(""); }}>
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-sm font-medium">{inst.name}</p>
+                    )}
                     <div className="flex items-center gap-2 mt-1">
                       <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono truncate max-w-[280px]">
                         {inst.api_key}
@@ -374,14 +410,29 @@ export default function TeamPage() {
                     </div>
                   </div>
                   {isOwner && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteInstance(inst.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        title="Rename instance"
+                        onClick={() => {
+                          setEditingInstanceId(inst.id);
+                          setEditingInstanceName(inst.name);
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        title="Delete instance"
+                        onClick={() => handleDeleteInstance(inst.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               ))}

@@ -405,9 +405,9 @@ function PreparedRotationCard({
 // ── Main page ────────────────────────────────
 
 export default function PreparedRotationsPage() {
-  const { activeTeam, loading: teamLoading } = useTeam();
+  const { activeTeam, activeInstance, loading: teamLoading } = useTeam();
   const { canManageContent } = useMyRole();
-  const instance = activeTeam?.instances?.[0] ?? null;
+  const instance = activeInstance;
   const { state, sendCommand, connected } = useInstanceWs();
 
   const preparedRotations = state?.prepared_rotations ?? [];

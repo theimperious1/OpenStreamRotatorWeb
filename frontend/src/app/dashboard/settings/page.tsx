@@ -60,9 +60,9 @@ function ToggleButton({
 }
 
 export default function SettingsPage() {
-  const { activeTeam } = useTeam();
+  const { activeTeam, activeInstance } = useTeam();
   const { canManageContent, isOwner } = useMyRole();
-  const instance = activeTeam?.instances?.[0] ?? null;
+  const instance = activeInstance;
   const { state, sendCommand, connected, lastAck } = useInstanceWs();
 
   const remoteSettings = state?.settings;

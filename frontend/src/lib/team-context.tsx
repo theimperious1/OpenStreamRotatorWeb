@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { listTeams, getTeam, type Team, type TeamDetail } from "@/lib/api";
+import { listTeams, getTeam, type Team, type TeamDetail, type Instance } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
 export type TeamRole = "owner" | "content_manager" | "moderator" | "viewer";
@@ -17,26 +17,47 @@ export type TeamRole = "owner" | "content_manager" | "moderator" | "viewer";
 interface TeamState {
   teams: Team[];
   activeTeam: TeamDetail | null;
+  activeInstance: Instance | null;
   loading: boolean;
   /** Re-fetch everything */
   refresh: () => Promise<void>;
   /** Switch to a different team */
   selectTeam: (teamId: string) => Promise<void>;
+  /** Switch to a different instance within the active team */
+  selectInstance: (instanceId: string) => void;
 }
 
 const TeamContext = createContext<TeamState>({
   teams: [],
   activeTeam: null,
+  activeInstance: null,
   loading: true,
   refresh: async () => {},
   selectTeam: async () => {},
+  selectInstance: () => {},
 });
 
 export function TeamProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTeam, setActiveTeam] = useState<TeamDetail | null>(null);
+  const [activeInstanceId, setActiveInstanceId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("osr_active_instance");
+    return null;
+  });
   const [loading, setLoading] = useState(true);
+
+  // Derive active instance from activeTeam + selected id (fallback to first)
+  const activeInstance = useMemo(() => {
+    const instances = activeTeam?.instances ?? [];
+    if (instances.length === 0) return null;
+    return instances.find((i) => i.id === activeInstanceId) ?? instances[0];
+  }, [activeTeam?.instances, activeInstanceId]);
+
+  const selectInstance = useCallback((instanceId: string) => {
+    setActiveInstanceId(instanceId);
+    if (typeof window !== "undefined") localStorage.setItem("osr_active_instance", instanceId);
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!user) return;
@@ -76,7 +97,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   return (
-    <TeamContext.Provider value={{ teams, activeTeam, loading, refresh, selectTeam }}>
+    <TeamContext.Provider value={{ teams, activeTeam, activeInstance, loading, refresh, selectTeam, selectInstance }}>
       {children}
     </TeamContext.Provider>
   );

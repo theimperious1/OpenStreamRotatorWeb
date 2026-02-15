@@ -117,8 +117,8 @@ const RECONNECT_MAX_MS = 30_000;
 // ── Provider ─────────────────────────────────
 
 export function InstanceWsProvider({ children }: { children: ReactNode }) {
-  const { activeTeam } = useTeam();
-  const instanceId = activeTeam?.instances?.[0]?.id ?? null;
+  const { activeInstance } = useTeam();
+  const instanceId = activeInstance?.id ?? null;
 
   const wsRef = useRef<WebSocket | null>(null);
   const [state, setState] = useState<InstanceState | null>(null);
@@ -150,7 +150,7 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
         console.log("[OSR-WS] Connected to", id);
         setConnected(true);
         reconnectDelay.current = RECONNECT_BASE_MS; // reset backoff
-        toast.success("Connected to OSR instance", { id: "ws-connect", duration: 2000 });
+        toast.dismiss("ws-connect");
       };
 
       ws.onmessage = (event) => {
@@ -237,6 +237,12 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
       oldWs.onclose = null;
       oldWs.close();
     }
+
+    // Clear stale state from previous instance
+    setState(null);
+    setLogs([]);
+    setConnected(false);
+    setLastAck(null);
 
     if (instanceId) {
       reconnectDelay.current = RECONNECT_BASE_MS;

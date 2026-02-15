@@ -12,6 +12,8 @@ import {
   Radio,
   LogOut,
   FolderClock,
+  Server,
+  ChevronDown,
 } from "lucide-react";
 import {
   Sidebar,
@@ -30,6 +32,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { useTeam } from "@/lib/team-context";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -44,12 +53,13 @@ const navItems = [
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const { activeTeam } = useTeam();
+  const { activeTeam, activeInstance, selectInstance } = useTeam();
 
-  // Derive connection status from the first instance (if any)
-  const instance = activeTeam?.instances?.[0];
+  const instances = activeTeam?.instances ?? [];
+  const instance = activeInstance;
   const isOnline = instance?.status === "online";
   const isPaused = instance?.status === "paused";
+  const multipleInstances = instances.length > 1;
 
   return (
     <Sidebar>
@@ -136,6 +146,41 @@ export function AppSidebar() {
             )}
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {instances.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Instance</SidebarGroupLabel>
+            <SidebarGroupContent className="px-2">
+              <Select
+                value={instance?.id ?? ""}
+                onValueChange={selectInstance}
+              >
+                <SelectTrigger className="h-8 text-xs w-full">
+                  <Server className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                  <SelectValue placeholder="Select instance" />
+                </SelectTrigger>
+                <SelectContent>
+                  {instances.map((inst) => (
+                    <SelectItem key={inst.id} value={inst.id}>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex rounded-full h-1.5 w-1.5 ${
+                            inst.status === "online"
+                              ? "bg-green-500"
+                              : inst.status === "paused"
+                              ? "bg-yellow-500"
+                              : "bg-red-500"
+                          }`}
+                        />
+                        {inst.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
