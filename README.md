@@ -175,4 +175,4 @@ alembic upgrade head
 
 ## License
 
-Copyright (c) 2026 theimperious1. All rights reserved. See [LICENSE.md](LICENSE.md) for details.
+See [LICENSE.md](LICENSE.md) for details.
