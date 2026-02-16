@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Radio } from "lucide-react";
 import { getApiBase } from "@/lib/api";
+import Image from "next/image";
 
 export default function HomePage() {
   const apiBase = useMemo(() => getApiBase(), []);
@@ -12,7 +12,7 @@ export default function HomePage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
       <div className="mx-auto max-w-md text-center space-y-8">
         <div className="flex items-center justify-center gap-3">
-          <Radio className="h-10 w-10 text-red-500" />
+          <Image src="/osr-icon-red-512.svg" alt="OSR" width={40} height={40} />
           <h1 className="text-4xl font-bold tracking-tight">
             OpenStreamRotator
           </h1>

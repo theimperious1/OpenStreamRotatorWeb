@@ -4,7 +4,8 @@ import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
-import { Radio, Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import Image from "next/image";
 
 export default function AuthCallbackPage() {
   const searchParams = useSearchParams();
@@ -32,7 +33,7 @@ export default function AuthCallbackPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
       <div className="mx-auto max-w-sm text-center space-y-6">
         <div className="flex items-center justify-center gap-3">
-          <Radio className="h-8 w-8 text-red-500" />
+          <Image src="/osr-icon-red-512.svg" alt="OSR" width={32} height={32} />
           <h1 className="text-2xl font-bold tracking-tight">
             OpenStreamRotator
           </h1>

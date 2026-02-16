@@ -1,4 +1,6 @@
-# OpenStreamRotatorWeb
+<p align="center">
+  <img src=".github/assets/osr-banner-1500x500.png" alt="OpenStreamRotatorWeb" width="100%" />
+</p>
 
 Web dashboard for [OpenStreamRotator](https://github.com/theimperious1/OpenStreamRotator) — monitor and control your 24/7 stream automation from any browser.
 

@@ -18,6 +18,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "OpenStreamRotator",
   description: "Automated 24/7 stream management dashboard",
+  icons: {
+    icon: "/osr-icon-red.ico",
+    apple: "/osr-icon-red-512.svg",
+  },
 };
 
 export default function RootLayout({

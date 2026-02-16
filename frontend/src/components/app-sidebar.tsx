@@ -9,7 +9,6 @@ import {
   ScrollText,
   Users,
   Settings,
-  Radio,
   LogOut,
   FolderClock,
   Server,
@@ -37,6 +36,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTeam } from "@/lib/team-context";
 import { useMyRole } from "@/lib/team-context";
 import { useInstanceWs } from "@/lib/instance-ws-context";
+import Image from "next/image";
 import {
   Select,
   SelectContent,
@@ -81,7 +81,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <Radio className="h-6 w-6 text-red-500" />
+          <Image src="/osr-icon-red-512.svg" alt="OSR" width={24} height={24} />
           <div>
             <h1 className="text-sm font-bold leading-none">
               OpenStreamRotator
