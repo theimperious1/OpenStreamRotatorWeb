@@ -568,6 +568,12 @@ export default function PlaylistsPage() {
 
   const hasChanges = initialized && (!playlistsEqual(localPlaylists, serverPlaylists) || Object.keys(renameMap).length > 0);
 
+  // Minimum enabled playlists check — need enough for current + next rotation
+  const minPerRotation = Number(settings?.min_playlists_per_rotation) || 2;
+  const enabledCount = localPlaylists.filter((p) => p.enabled).length;
+  const minEnabledRequired = minPerRotation * 2;
+  const notEnoughPlaylists = initialized && enabledCount < minEnabledRequired;
+
   // Title truncation warning — worst-case check using local (possibly edited) playlists
   const MAX_TITLE_LENGTH = 140;
   const titleWarning = useMemo(() => {
@@ -805,13 +811,35 @@ export default function PlaylistsPage() {
         </Tooltip>
       )}
 
+      {/* Not enough playlists warning (persistent, even without unsaved changes) */}
+      {notEnoughPlaylists && !hasChanges && (
+        <Card className="border-red-500/50 bg-red-500/5">
+          <CardContent className="py-3">
+            <p className="text-sm font-medium text-red-600 dark:text-red-400 flex items-center gap-1">
+              <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+              You need at least {minEnabledRequired} enabled playlists ({minPerRotation} for the current rotation + {minPerRotation} for the next).
+              Currently enabled: {enabledCount}.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Unsaved Changes Bar */}
       {hasChanges && (
         <Card className="border-yellow-500/50 bg-yellow-500/5">
           <CardContent className="py-3 flex items-center justify-between">
-            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-              You have unsaved changes
-            </p>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                You have unsaved changes
+              </p>
+              {notEnoughPlaylists && (
+                <p className="text-sm font-medium text-red-600 dark:text-red-400 flex items-center gap-1">
+                  <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                  You need at least {minEnabledRequired} enabled playlists ({minPerRotation} for the current rotation + {minPerRotation} for the next).
+                  Currently enabled: {enabledCount}.
+                </p>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
@@ -828,7 +856,7 @@ export default function PlaylistsPage() {
               <Button
                 size="sm"
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || notEnoughPlaylists}
               >
                 {saving ? (
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
