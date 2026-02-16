@@ -16,6 +16,7 @@ import {
   Tv,
   HelpCircle,
   Heart,
+  Github,
 } from "lucide-react";
 import {
   Sidebar,
@@ -212,6 +213,26 @@ export function AppSidebar() {
           <Heart className="h-3.5 w-3.5 text-pink-500" />
           <span>Support this project</span>
         </a>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3 px-0.5">
+          <Github className="h-3.5 w-3.5" />
+          <a
+            href="https://github.com/theimperious1/OpenStreamRotator"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground transition-colors"
+          >
+            Core
+          </a>
+          <span>·</span>
+          <a
+            href="https://github.com/theimperious1/OpenStreamRotatorWeb"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground transition-colors"
+          >
+            Web
+          </a>
+        </div>
         <div className="flex items-center gap-2">
           <Avatar className="h-7 w-7">
             {user?.discord_avatar && (

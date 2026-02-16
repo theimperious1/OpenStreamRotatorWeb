@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -530,41 +530,67 @@ export default function PlaylistsPage() {
   const canTriggerRotation = state?.can_trigger_rotation ?? true;
 
   // ── Local working copy ───────────────────────
-  const [localPlaylists, setLocalPlaylists] = useState<PlaylistConfig[]>([]);
-  const [initialized, setInitialized] = useState(false);
+  interface LocalState {
+    playlists: PlaylistConfig[];
+    initialized: boolean;
+    pendingSync: boolean;
+    renameMap: Record<string, string>;
+    showAddForm: boolean;
+    editingName: string | null;
+    // Track previous server values for change detection (avoids refs during render)
+    _prevServerPlaylists: PlaylistConfig[];
+    _prevStatus: string | undefined;
+  }
+  const initialLocalState: LocalState = {
+    playlists: [],
+    initialized: false,
+    pendingSync: false,
+    renameMap: {},
+    showAddForm: false,
+    editingName: null,
+    _prevServerPlaylists: [],
+    _prevStatus: undefined,
+  };
+  const [local, setLocal] = useState<LocalState>(initialLocalState);
   const [saving, setSaving] = useState(false);
-  // Track renames: currentName → original server name
-  const [renameMap, setRenameMap] = useState<Record<string, string>>({});
-  // After save, accept the next server update unconditionally
-  const [pendingSync, setPendingSync] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingName, setEditingName] = useState<string | null>(null);
 
-  // Sync from server when we first get data, or when there are no local changes
-  useEffect(() => {
-    // Reset when WS disconnects or OSR goes offline
-    if (!state || state.status === "offline") {
-      setLocalPlaylists([]);
-      setInitialized(false);
-      setShowAddForm(false);
-      setEditingName(null);
-      setRenameMap({});
-      return;
-    }
-    if (!initialized) {
-      setLocalPlaylists(serverPlaylists);
-      setInitialized(true);
-      setRenameMap({});
-      return;
-    }
-    // If no unsaved changes (including renames), keep in sync with server
-    if (pendingSync) {
-      setLocalPlaylists(serverPlaylists);
-      setPendingSync(false);
-    } else if (playlistsEqual(localPlaylists, serverPlaylists) && Object.keys(renameMap).length === 0) {
-      setLocalPlaylists(serverPlaylists);
-    }
-  }, [serverPlaylists, state]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Convenience accessors
+  const localPlaylists = local.playlists;
+  const initialized = local.initialized;
+  const renameMap = local.renameMap;
+  const showAddForm = local.showAddForm;
+  const editingName = local.editingName;
+
+  // Convenience setters (single-key updates)
+  const setLocalPlaylists = useCallback((v: PlaylistConfig[] | ((prev: PlaylistConfig[]) => PlaylistConfig[])) => {
+    setLocal((prev) => ({ ...prev, playlists: typeof v === "function" ? v(prev.playlists) : v }));
+  }, []);
+  const setRenameMap = useCallback((v: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => {
+    setLocal((prev) => ({ ...prev, renameMap: typeof v === "function" ? v(prev.renameMap) : v }));
+  }, []);
+  const setPendingSync = useCallback((v: boolean) => setLocal((prev) => ({ ...prev, pendingSync: v })), []);
+  const setShowAddForm = useCallback((v: boolean) => setLocal((prev) => ({ ...prev, showAddForm: v })), []);
+  const setEditingName = useCallback((v: string | null) => setLocal((prev) => ({ ...prev, editingName: v })), []);
+
+  // Sync from server — render-time state adjustment (React docs: "adjusting state when props change")
+  // When the updater returns prev unchanged, React bails out with no extra render.
+  if (state?.status !== local._prevStatus || serverPlaylists !== local._prevServerPlaylists) {
+    setLocal((prev) => {
+      const base = { ...prev, _prevServerPlaylists: serverPlaylists, _prevStatus: state?.status };
+      const isOffline = !state || state.status === "offline";
+      if (isOffline) return { ...initialLocalState, _prevServerPlaylists: serverPlaylists, _prevStatus: state?.status };
+      if (!prev.initialized) {
+        return { ...base, playlists: serverPlaylists, initialized: true, renameMap: {} };
+      }
+      if (prev.pendingSync) {
+        return { ...base, playlists: serverPlaylists, pendingSync: false };
+      }
+      if (playlistsEqual(prev.playlists, serverPlaylists) && Object.keys(prev.renameMap).length === 0) {
+        return { ...base, playlists: serverPlaylists };
+      }
+      return base;
+    });
+  }
 
   const hasChanges = initialized && (!playlistsEqual(localPlaylists, serverPlaylists) || Object.keys(renameMap).length > 0);
 
@@ -609,7 +635,7 @@ export default function PlaylistsPage() {
       setLocalPlaylists((prev) => [...prev, newPlaylist]);
       setShowAddForm(false);
     },
-    []
+    [setLocalPlaylists, setShowAddForm]
   );
 
   const handleUpdate = useCallback(
@@ -633,7 +659,7 @@ export default function PlaylistsPage() {
       }
       setEditingName(null);
     },
-    []
+    [setLocalPlaylists, setRenameMap, setEditingName]
   );
 
   const handleRemove = useCallback(
@@ -649,7 +675,7 @@ export default function PlaylistsPage() {
         return prev;
       });
     },
-    []
+    [setLocalPlaylists, setRenameMap]
   );
 
   const handleToggle = useCallback(
@@ -660,7 +686,7 @@ export default function PlaylistsPage() {
         )
       );
     },
-    []
+    [setLocalPlaylists]
   );
 
   const handleDiscard = useCallback(() => {
@@ -668,7 +694,7 @@ export default function PlaylistsPage() {
     setEditingName(null);
     setShowAddForm(false);
     setRenameMap({});
-  }, [serverPlaylists]);
+  }, [serverPlaylists, setLocalPlaylists, setEditingName, setShowAddForm, setRenameMap]);
 
   // ── Save: diff local vs server and send commands ──
   const handleSave = useCallback(() => {
@@ -743,7 +769,7 @@ export default function PlaylistsPage() {
     setPendingSync(true);
     toast.success("Playlist changes saved");
     setSaving(false);
-  }, [localPlaylists, serverPlaylists, sendCommand, renameMap]);
+  }, [localPlaylists, serverPlaylists, sendCommand, renameMap, setRenameMap, setPendingSync]);
 
   if (teamLoading) {
     return (
