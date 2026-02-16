@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { useTeam } from "@/lib/team-context";
 import { useMyRole } from "@/lib/team-context";
+import { useInstanceWs } from "@/lib/instance-ws-context";
 import {
   Select,
   SelectContent,
@@ -60,11 +61,15 @@ export function AppSidebar() {
   const { user, logout } = useAuth();
   const { activeTeam, activeInstance, selectInstance } = useTeam();
   const { isViewOnly } = useMyRole();
+  const { state: wsState } = useInstanceWs();
 
   const instances = activeTeam?.instances ?? [];
   const instance = activeInstance;
-  const isOnline = instance?.status === "online";
-  const isPaused = instance?.status === "paused";
+  // Prefer live WebSocket state over stale REST snapshot
+  const liveStatus = wsState?.status ?? instance?.status;
+  const liveObsConnected = wsState?.obs_connected ?? instance?.obs_connected ?? false;
+  const isOnline = liveStatus === "online";
+  const isPaused = liveStatus === "paused";
 
   const filteredNavItems = isViewOnly
     ? navItems.filter((item) => item.href !== "/dashboard/logs")
@@ -140,7 +145,7 @@ export function AppSidebar() {
                       : "Stream Offline"}
                   </span>
                 </div>
-                {instance.obs_connected && (
+                {liveObsConnected && (
                   <div className="flex items-center gap-2 text-xs mt-2">
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                       OBS
@@ -169,14 +174,17 @@ export function AppSidebar() {
                   <SelectValue placeholder="Select instance" />
                 </SelectTrigger>
                 <SelectContent>
-                  {instances.map((inst) => (
+                  {instances.map((inst) => {
+                    // Use live WS status for the active instance
+                    const instStatus = inst.id === instance?.id ? (liveStatus ?? inst.status) : inst.status;
+                    return (
                     <SelectItem key={inst.id} value={inst.id}>
                       <div className="flex items-center gap-2">
                         <span
                           className={`inline-flex rounded-full h-1.5 w-1.5 ${
-                            inst.status === "online"
+                            instStatus === "online"
                               ? "bg-green-500"
-                              : inst.status === "paused"
+                              : instStatus === "paused"
                               ? "bg-yellow-500"
                               : "bg-red-500"
                           }`}
@@ -184,7 +192,8 @@ export function AppSidebar() {
                         {inst.name}
                       </div>
                     </SelectItem>
-                  ))}
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </SidebarGroupContent>

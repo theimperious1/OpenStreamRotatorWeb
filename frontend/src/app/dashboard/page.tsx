@@ -90,20 +90,20 @@ export default function DashboardPage() {
   const instance = activeInstance;
   const { state, logs, connected, sendCommand } = useInstanceWs();
 
-  // Merge WebSocket live state with the DB snapshot from the team detail
-  const isOnline = state?.status === "online" || instance?.status === "online";
-  const isPaused = state?.status === "paused" || instance?.status === "paused";
+  // Only use live WebSocket state — never fall back to stale DB snapshots
+  const isOnline = state?.status === "online";
+  const isPaused = state?.status === "paused";
   const isManualPause = state?.manual_pause ?? false;
-  const currentVideo = state?.current_video ?? instance?.current_video ?? "—";
-  const currentPlaylist = state?.current_playlist ?? instance?.current_playlist ?? "—";
+  const currentVideo = state?.current_video ?? "—";
+  const currentPlaylist = state?.current_playlist ?? "—";
   const currentCategory = (() => {
-    const raw = state?.current_category ?? instance?.current_category;
+    const raw = state?.current_category;
     if (!raw) return "—";
     if (typeof raw === "string") return raw;
     return raw.twitch || raw.kick || "—";
   })();
-  const obsConnected = state?.obs_connected ?? instance?.obs_connected ?? false;
-  const uptimeSeconds = state?.uptime_seconds ?? instance?.uptime_seconds ?? 0;
+  const obsConnected = state?.obs_connected ?? false;
+  const uptimeSeconds = state?.uptime_seconds ?? 0;
   const connections = state?.connections;
 
   if (teamLoading) {
@@ -205,7 +205,7 @@ export default function DashboardPage() {
                 )}
               </Button>
             )}
-            {connected && (
+            {connected && state?.status !== "offline" && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Badge variant="outline" className="text-green-500 border-green-500/30 cursor-help">

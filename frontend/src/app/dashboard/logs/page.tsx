@@ -25,7 +25,7 @@ const levelColors: Record<LogEntry["level"], string> = {
 export default function LogsPage() {
   const { loading: teamLoading } = useTeam();
   const { isViewOnly } = useMyRole();
-  const { logs: wsLogs, connected } = useInstanceWs();
+  const { logs: wsLogs, connected, state } = useInstanceWs();
   const [filter, setFilter] = useState<LogEntry["level"] | "all">("all");
   const [search, setSearch] = useState("");
 
@@ -59,14 +59,14 @@ export default function LogsPage() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Logs</h2>
           <p className="text-muted-foreground">
-            {connected
+            {connected && state?.status !== "offline"
               ? "Live log stream from your OSR instance"
               : "Logs will stream when an OSR instance connects"}{" "}
             <span className="text-xs">— logs are live only and do not persist across restarts</span>
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          {connected && (
+          {connected && state?.status !== "offline" && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge variant="outline" className="text-green-500 border-green-500/30 cursor-help">

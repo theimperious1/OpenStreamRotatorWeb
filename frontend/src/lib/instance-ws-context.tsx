@@ -195,6 +195,7 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
         if (!mountedRef.current) return;
         console.log("[OSR-WS] Disconnected:", e.code, e.reason);
         setConnected(false);
+        setState(null); // Clear stale state so dashboard shows offline
         wsRef.current = null;
 
         // Auto-reconnect with exponential backoff (unless auth/permission error)

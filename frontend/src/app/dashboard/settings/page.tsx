@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -72,37 +72,29 @@ export default function SettingsPage() {
   const remoteSettings = state?.settings;
   const connections = state?.connections;
 
-  // Local draft state for editable fields
-  const [draft, setDraft] = useState<OsrSettings>({});
+  // Local draft state for editable fields — seed from current remote to avoid flash
+  const [draft, setDraft] = useState<OsrSettings>(() => remoteSettings ?? {});
   const [dirty, setDirty] = useState(false);
   const [envDraft, setEnvDraft] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [skipNextSync, setSkipNextSync] = useState(false);
+  const saveTimestampRef = useRef(0);
 
   const updateEnvDraft = useCallback((key: string, value: string) => {
     setEnvDraft((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const anyDirty = !saving && (dirty || Object.keys(envDraft).length > 0);
+  // Button is enabled purely based on user edits — no delays
+  const anyDirty = dirty || Object.keys(envDraft).length > 0;
 
-  // Sync remote settings into local draft when they change (render-time
-  // adjustment – avoids cascading effects).  After a save we skip one cycle so
-  // stale remote data doesn't overwrite the draft.
-  const [prevRemote, setPrevRemote] = useState(remoteSettings);
-  if (remoteSettings !== prevRemote) {
-    setPrevRemote(remoteSettings);
-    if (remoteSettings && !dirty) {
-      if (skipNextSync) {
-        setSkipNextSync(false);
-      } else {
-        setDraft(remoteSettings);
-        if (saving) {
-          setEnvDraft({});
-          setSaving(false);
-        }
-      }
+  // Sync remote settings into local draft when they arrive, but skip for
+  // 3 seconds after a save to prevent stale server data from overwriting
+  // what we just sent.
+  useEffect(() => {
+    if (!remoteSettings) return;
+    const sinceSave = Date.now() - saveTimestampRef.current;
+    if (!dirty && sinceSave > 3000) {
+      setDraft(remoteSettings);
     }
-  }
+  }, [remoteSettings]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateDraft = useCallback(
     (key: keyof OsrSettings, value: OsrSettings[keyof OsrSettings]) => {
@@ -134,11 +126,9 @@ export default function SettingsPage() {
     for (const [key, value] of Object.entries(envDraft)) {
       sendCommand("update_env", { key, value });
     }
-    setSkipNextSync(true);
-    setSaving(true);
+    saveTimestampRef.current = Date.now();
     setDirty(false);
-    // envDraft is NOT cleared here — keeps merged config showing pending values
-    // until the server responds and the sync effect clears it
+    setEnvDraft({});
   }
 
   function handleToggle(key: keyof OsrSettings) {
@@ -155,7 +145,7 @@ export default function SettingsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {connected ? (
+          {connected && state?.status !== "offline" ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge

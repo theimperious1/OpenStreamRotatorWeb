@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -28,14 +28,34 @@ import {
   X,
   ToggleLeft,
   ToggleRight,
+  Save,
+  Undo2,
 } from "lucide-react";
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
+import { toast } from "sonner";
 
 // ── Helpers ──────────────────────────────────
+
+/** Convert youtube.com/watch?v=...&list=... → youtube.com/playlist?list=... */
+function normalizePlaylistUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (
+      (u.hostname === "www.youtube.com" || u.hostname === "youtube.com") &&
+      u.pathname === "/watch" &&
+      u.searchParams.has("list")
+    ) {
+      return `https://www.youtube.com/playlist?list=${u.searchParams.get("list")}`;
+    }
+  } catch {
+    // not a valid URL yet — leave as-is
+  }
+  return url;
+}
 
 /** Button that shows brief "Sent!" feedback after click. */
 function CommandButton({
@@ -166,7 +186,7 @@ function AddPlaylistForm({
           <Input
             placeholder="https://www.youtube.com/playlist?list=..."
             value={form.url}
-            onChange={(e) => setForm((p) => ({ ...p, url: e.target.value }))}
+            onChange={(e) => setForm((p) => ({ ...p, url: normalizePlaylistUrl(e.target.value) }))}
             className="text-sm"
           />
         </div>
@@ -212,19 +232,29 @@ function AddPlaylistForm({
 
 function EditPlaylistForm({
   playlist,
+  allNames,
   onSave,
   onCancel,
 }: {
   playlist: PlaylistConfig;
-  onSave: (updates: { url: string; twitch_category: string; kick_category: string; priority: number }) => void;
+  allNames: string[];
+  onSave: (updates: { name: string; url: string; twitch_category: string; kick_category: string; priority: number }) => void;
   onCancel: () => void;
 }) {
   const [form, setForm] = useState({
+    name: playlist.name,
     url: playlist.url,
     twitch_category: playlist.twitch_category,
     kick_category: playlist.kick_category,
     priority: playlist.priority,
   });
+
+  const nameConflict =
+    form.name.trim() !== "" &&
+    form.name.trim().toLowerCase() !== playlist.name.toLowerCase() &&
+    allNames.some(
+      (n) => n.toLowerCase() === form.name.trim().toLowerCase()
+    );
 
   return (
     <Card className="border-yellow-500/30">
@@ -232,7 +262,7 @@ function EditPlaylistForm({
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <Pencil className="h-3.5 w-3.5" />
-            Editing: {playlist.name}
+            Editing Playlist
           </CardTitle>
           <Button
             variant="ghost"
@@ -247,11 +277,24 @@ function EditPlaylistForm({
       <CardContent className="space-y-2">
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">
+            Name
+          </label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+            className={`text-sm ${nameConflict ? "border-red-500" : ""}`}
+          />
+          {nameConflict && (
+            <p className="text-xs text-red-500 mt-1">A playlist with this name already exists</p>
+          )}
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">
             URL
           </label>
           <Input
             value={form.url}
-            onChange={(e) => setForm((p) => ({ ...p, url: e.target.value }))}
+            onChange={(e) => setForm((p) => ({ ...p, url: normalizePlaylistUrl(e.target.value) }))}
             className="text-sm"
           />
         </div>
@@ -305,7 +348,11 @@ function EditPlaylistForm({
           <Button variant="ghost" size="sm" onClick={onCancel}>
             Cancel
           </Button>
-          <Button size="sm" onClick={() => onSave(form)}>
+          <Button
+            size="sm"
+            disabled={nameConflict || form.name.trim() === ""}
+            onClick={() => onSave({ ...form, name: form.name.trim() })}
+          >
             Save
           </Button>
         </div>
@@ -465,54 +512,209 @@ function PlaylistCard({
 
 // ── Page ─────────────────────────────────────
 
+/** Deep-compare two playlist arrays by serialising to JSON. */
+function playlistsEqual(a: PlaylistConfig[], b: PlaylistConfig[]): boolean {
+  if (a.length !== b.length) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export default function PlaylistsPage() {
   const { activeInstance: instance, loading: teamLoading } = useTeam();
   const { canControl, canManageContent } = useMyRole();
   const { state, sendCommand, connected } = useInstanceWs();
 
-  const playlists = state?.playlists ?? [];
+  const serverPlaylists = useMemo(() => state?.playlists ?? [], [state?.playlists]);
   const settings = state?.settings;
-  const currentPlaylist = state?.current_playlist ?? instance?.current_playlist;
+  const currentPlaylist = state?.current_playlist ?? null;
   const canTriggerRotation = state?.can_trigger_rotation ?? true;
 
+  // ── Local working copy ───────────────────────
+  const [localPlaylists, setLocalPlaylists] = useState<PlaylistConfig[]>([]);
+  const [initialized, setInitialized] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // Track renames: currentName → original server name
+  const [renameMap, setRenameMap] = useState<Record<string, string>>({});
+  // After save, accept the next server update unconditionally
+  const [pendingSync, setPendingSync] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingName, setEditingName] = useState<string | null>(null);
 
+  // Sync from server when we first get data, or when there are no local changes
+  useEffect(() => {
+    // Reset when WS disconnects or OSR goes offline
+    if (!state || state.status === "offline") {
+      setLocalPlaylists([]);
+      setInitialized(false);
+      setShowAddForm(false);
+      setEditingName(null);
+      setRenameMap({});
+      return;
+    }
+    if (!initialized) {
+      setLocalPlaylists(serverPlaylists);
+      setInitialized(true);
+      setRenameMap({});
+      return;
+    }
+    // If no unsaved changes (including renames), keep in sync with server
+    if (pendingSync) {
+      setLocalPlaylists(serverPlaylists);
+      setPendingSync(false);
+    } else if (playlistsEqual(localPlaylists, serverPlaylists) && Object.keys(renameMap).length === 0) {
+      setLocalPlaylists(serverPlaylists);
+    }
+  }, [serverPlaylists, state]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const hasChanges = initialized && (!playlistsEqual(localPlaylists, serverPlaylists) || Object.keys(renameMap).length > 0);
+
+  // ── Local mutations (no server calls) ────────
   const handleAdd = useCallback(
     (data: PlaylistFormData) => {
-      sendCommand("add_playlist", {
+      const newPlaylist: PlaylistConfig = {
         name: data.name,
         url: data.url,
         twitch_category: data.twitch_category,
         kick_category: data.kick_category,
         priority: data.priority,
-      });
+        enabled: true,
+      };
+      setLocalPlaylists((prev) => [...prev, newPlaylist]);
       setShowAddForm(false);
     },
-    [sendCommand]
+    []
   );
 
   const handleUpdate = useCallback(
-    (name: string, updates: { url: string; twitch_category: string; kick_category: string; priority: number }) => {
-      sendCommand("update_playlist", { name, ...updates });
+    (oldName: string, updates: { name: string; url: string; twitch_category: string; kick_category: string; priority: number }) => {
+      const newName = updates.name;
+      setLocalPlaylists((prev) =>
+        prev.map((p) => (p.name === oldName ? { ...p, ...updates } : p))
+      );
+      // Track the rename chain: if oldName was itself a rename, follow it back
+      if (newName !== oldName) {
+        setRenameMap((prev) => {
+          const next = { ...prev };
+          const originalName = next[oldName] ?? oldName;
+          delete next[oldName];
+          // Only store if the new name differs from the original server name
+          if (newName !== originalName) {
+            next[newName] = originalName;
+          }
+          return next;
+        });
+      }
       setEditingName(null);
     },
-    [sendCommand]
+    []
   );
 
   const handleRemove = useCallback(
     (name: string) => {
-      sendCommand("remove_playlist", { name });
+      setLocalPlaylists((prev) => prev.filter((p) => p.name !== name));
+      // Clean up rename tracking if this playlist was renamed
+      setRenameMap((prev) => {
+        if (name in prev) {
+          const next = { ...prev };
+          delete next[name];
+          return next;
+        }
+        return prev;
+      });
     },
-    [sendCommand]
+    []
   );
 
   const handleToggle = useCallback(
     (name: string, currentEnabled: boolean) => {
-      sendCommand("toggle_playlist", { name, enabled: !currentEnabled });
+      setLocalPlaylists((prev) =>
+        prev.map((p) =>
+          p.name === name ? { ...p, enabled: !currentEnabled } : p
+        )
+      );
     },
-    [sendCommand]
+    []
   );
+
+  const handleDiscard = useCallback(() => {
+    setLocalPlaylists(serverPlaylists);
+    setEditingName(null);
+    setShowAddForm(false);
+    setRenameMap({});
+  }, [serverPlaylists]);
+
+  // ── Save: diff local vs server and send commands ──
+  const handleSave = useCallback(() => {
+    setSaving(true);
+    const serverMap = new Map(serverPlaylists.map((p) => [p.name, p]));
+    // Build a set of server names that were renamed to something else
+    const renamedFromServer = new Set(Object.values(renameMap));
+    const localMap = new Map(localPlaylists.map((p) => [p.name, p]));
+
+    // 1) Send renames first (so subsequent update_playlist uses the new name)
+    for (const [currentName, originalName] of Object.entries(renameMap)) {
+      if (serverMap.has(originalName)) {
+        sendCommand("rename_playlist", { old_name: originalName, new_name: currentName });
+      }
+    }
+
+    // 2) Removed playlists — skip names that were just renamed
+    for (const sp of serverPlaylists) {
+      if (!localMap.has(sp.name) && !renamedFromServer.has(sp.name)) {
+        sendCommand("remove_playlist", { name: sp.name });
+      }
+    }
+
+    // 3) Added playlists — truly new (not in server and not a rename)
+    for (const lp of localPlaylists) {
+      const isRenamed = renameMap[lp.name]; // was renamed from server name
+      if (!serverMap.has(lp.name) && !isRenamed) {
+        sendCommand("add_playlist", {
+          name: lp.name,
+          url: lp.url,
+          twitch_category: lp.twitch_category,
+          kick_category: lp.kick_category,
+          priority: lp.priority,
+        });
+        if (!lp.enabled) {
+          sendCommand("toggle_playlist", { name: lp.name, enabled: false });
+        }
+        continue;
+      }
+    }
+
+    // 4) Modified playlists (compare against server data using original name)
+    for (const lp of localPlaylists) {
+      const originalName = renameMap[lp.name] ?? lp.name;
+      const sp = serverMap.get(originalName);
+      if (!sp) continue; // new — handled above
+
+      // Check enabled toggle
+      if (lp.enabled !== sp.enabled) {
+        sendCommand("toggle_playlist", { name: lp.name, enabled: lp.enabled });
+      }
+
+      // Check field updates (compare against server values)
+      if (
+        lp.url !== sp.url ||
+        lp.twitch_category !== sp.twitch_category ||
+        lp.kick_category !== sp.kick_category ||
+        lp.priority !== sp.priority
+      ) {
+        sendCommand("update_playlist", {
+          name: lp.name,
+          url: lp.url,
+          twitch_category: lp.twitch_category,
+          kick_category: lp.kick_category,
+          priority: lp.priority,
+        });
+      }
+    }
+
+    setRenameMap({});
+    setPendingSync(true);
+    toast.success("Playlist changes saved");
+    setSaving(false);
+  }, [localPlaylists, serverPlaylists, sendCommand, renameMap]);
 
   if (teamLoading) {
     return (
@@ -532,7 +734,7 @@ export default function PlaylistsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {connected && (
+          {connected && state?.status !== "offline" && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge
@@ -563,6 +765,43 @@ export default function PlaylistsPage() {
         </div>
       </div>
 
+      {/* Unsaved Changes Bar */}
+      {hasChanges && (
+        <Card className="border-yellow-500/50 bg-yellow-500/5">
+          <CardContent className="py-3 flex items-center justify-between">
+            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+              You have unsaved changes
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (window.confirm("Discard all unsaved playlist changes?")) {
+                    handleDiscard();
+                  }
+                }}
+              >
+                <Undo2 className="h-4 w-4 mr-1" />
+                Discard
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={saving}
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-1" />
+                )}
+                Save Changes
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Current Rotation */}
       {currentPlaylist && (
         <Card className="border-primary/50 bg-primary/5">
@@ -585,9 +824,9 @@ export default function PlaylistsPage() {
       )}
 
       {/* Playlist Grid */}
-      {playlists.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {playlists.map((playlist) => {
+      {localPlaylists.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
+          {localPlaylists.map((playlist) => {
             const isActive = currentPlaylist
               ?.split(", ")
               .includes(playlist.name);
@@ -596,6 +835,7 @@ export default function PlaylistsPage() {
                 <EditPlaylistForm
                   key={playlist.name}
                   playlist={playlist}
+                  allNames={localPlaylists.filter((p) => p.name !== playlist.name).map((p) => p.name)}
                   onSave={(updates) => handleUpdate(playlist.name, updates)}
                   onCancel={() => setEditingName(null)}
                 />

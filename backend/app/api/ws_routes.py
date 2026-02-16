@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db, async_session
-from app.models import OSRInstance, TeamMember
+from app.models import OSRInstance, TeamMember, InstanceStatus
 from app.auth import decode_access_token
 from app.websocket import manager
 
@@ -56,14 +56,14 @@ async def osr_instance_ws(websocket: WebSocket, api_key: str):
                     await manager.handle_log_entry(instance_id, data.get("data", {}))
     except WebSocketDisconnect:
         logger.info(f"OSR instance disconnected: {instance_id}")
-        manager.disconnect_osr(instance_id)
+        await manager.disconnect_osr_and_notify(instance_id)
 
-        # Mark instance offline
+        # Mark instance offline in DB
         async with async_session() as db:
             result = await db.execute(select(OSRInstance).where(OSRInstance.id == instance_id))
             instance = result.scalar_one_or_none()
             if instance:
-                instance.status = "offline"
+                instance.status = InstanceStatus.offline
                 await db.commit()
 
 

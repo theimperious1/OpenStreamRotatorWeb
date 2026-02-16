@@ -49,6 +49,41 @@ class ConnectionManager:
         self.osr_connections.pop(instance_id, None)
         logger.info(f"OSR instance {instance_id} disconnected")
 
+    async def disconnect_osr_and_notify(self, instance_id: str):
+        """Remove OSR connection and broadcast offline state to browsers."""
+        self.disconnect_osr(instance_id)
+
+        # Build an offline snapshot so browsers immediately reflect the disconnect
+        offline_state = {
+            "status": "offline",
+            "manual_pause": False,
+            "current_video": None,
+            "current_playlist": None,
+            "current_category": None,
+            "obs_connected": False,
+            "uptime_seconds": 0,
+            "playlists": self.state_cache.get(instance_id, {}).get("playlists", []),
+            "settings": self.state_cache.get(instance_id, {}).get("settings", {}),
+            "queue": [],
+            "connections": {
+                "obs": False,
+                "twitch": False,
+                "kick": False,
+                "discord_webhook": False,
+                "twitch_enabled": self.state_cache.get(instance_id, {}).get("connections", {}).get("twitch_enabled", False),
+                "kick_enabled": self.state_cache.get(instance_id, {}).get("connections", {}).get("kick_enabled", False),
+            },
+            "download_active": False,
+            "can_skip": False,
+            "can_trigger_rotation": False,
+            "prepared_rotations": self.state_cache.get(instance_id, {}).get("prepared_rotations", []),
+            "any_downloading": False,
+            "executing_slug": None,
+            "env_config": self.state_cache.get(instance_id, {}).get("env_config"),
+        }
+        self.state_cache[instance_id] = offline_state
+        await self.broadcast_to_browsers(instance_id, {"type": "state", "data": offline_state})
+
     async def send_command_to_osr(self, instance_id: str, command: dict) -> bool:
         """Send a command to a connected OSR instance. Returns True if delivered."""
         ws = self.osr_connections.get(instance_id)

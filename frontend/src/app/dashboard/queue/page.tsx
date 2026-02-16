@@ -73,10 +73,10 @@ export default function QueuePage() {
   const { canControl } = useMyRole();
   const { state, sendCommand, connected, lastAck } = useInstanceWs();
 
-  const currentVideo = state?.current_video ?? instance?.current_video;
-  const currentPlaylist = state?.current_playlist ?? instance?.current_playlist;
+  const currentVideo = state?.current_video ?? null;
+  const currentPlaylist = state?.current_playlist ?? null;
   const currentCategory = (() => {
-    const raw = state?.current_category ?? instance?.current_category;
+    const raw = state?.current_category ?? null;
     if (!raw) return null;
     if (typeof raw === "string") return raw;
     return raw.twitch || raw.kick || null;
@@ -109,7 +109,7 @@ export default function QueuePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {connected && (
+          {connected && state?.status !== "offline" && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge
