@@ -470,7 +470,7 @@ export default function PreparedRotationsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {connected && state?.status !== "offline" && (
+          {state && state.status !== "offline" && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge variant="outline" className="text-green-500 border-green-500/30 cursor-help">

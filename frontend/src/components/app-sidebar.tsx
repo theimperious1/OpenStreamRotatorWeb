@@ -61,13 +61,14 @@ export function AppSidebar() {
   const { user, logout } = useAuth();
   const { activeTeam, activeInstance, selectInstance } = useTeam();
   const { isViewOnly } = useMyRole();
-  const { state: wsState } = useInstanceWs();
+  const { state: wsState, connected: wsConnected } = useInstanceWs();
 
   const instances = activeTeam?.instances ?? [];
   const instance = activeInstance;
-  // Prefer live WebSocket state over stale REST snapshot
-  const liveStatus = wsState?.status ?? instance?.status;
-  const liveObsConnected = wsState?.obs_connected ?? instance?.obs_connected ?? false;
+  // Prefer live WebSocket state over REST snapshot. When the browser WS is
+  // connected but no OSR state has arrived, the instance is offline.
+  const liveStatus = wsState?.status ?? (wsConnected ? "offline" : instance?.status ?? "offline");
+  const liveObsConnected = wsState?.obs_connected ?? false;
   const isOnline = liveStatus === "online";
   const isPaused = liveStatus === "paused";
 

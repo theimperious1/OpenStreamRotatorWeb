@@ -205,7 +205,7 @@ export default function DashboardPage() {
                 )}
               </Button>
             )}
-            {connected && state?.status !== "offline" && (
+            {state && state.status !== "offline" && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Badge variant="outline" className="text-green-500 border-green-500/30 cursor-help">

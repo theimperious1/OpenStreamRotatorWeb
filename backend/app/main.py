@@ -4,7 +4,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from sqlalchemy import update
+
 from app.config import get_settings
+from app.database import async_session
+from app.models import OSRInstance, InstanceStatus
 from app.api.auth_routes import router as auth_router
 from app.api.team_routes import router as team_router
 from app.api.invite_routes import router as invite_router
@@ -18,6 +22,14 @@ async def lifespan(app: FastAPI):
 
     Run `python -m alembic upgrade head` before starting the server.
     """
+    # No OSR instance can be connected at startup — reset stale statuses
+    async with async_session() as db:
+        await db.execute(
+            update(OSRInstance)
+            .where(OSRInstance.status != InstanceStatus.offline)
+            .values(status=InstanceStatus.offline, obs_connected=False)
+        )
+        await db.commit()
     yield
 
 

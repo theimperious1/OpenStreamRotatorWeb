@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models import User, Team, TeamMember, TeamRole, OSRInstance
+from app.models import User, Team, TeamMember, TeamRole, OSRInstance, InstanceStatus
 from app.schemas import (
     TeamCreate, TeamOut, TeamDetailOut, TeamMemberOut,
     RoleUpdate, InviteCreate,
@@ -190,6 +190,24 @@ async def get_team(
         )
         for m in team.members
     ]
+
+    # Overlay live WS state onto DB snapshots so REST always reflects
+    # the actual connection status (DB may be stale if the backend
+    # restarted or the disconnect handler didn't fire).
+    from app.websocket import manager as ws_manager
+    for inst in team.instances:
+        if inst.id in ws_manager.osr_connections:
+            cached = ws_manager.state_cache.get(inst.id)
+            if cached:
+                inst.status = InstanceStatus(cached.get("status", "online"))
+                inst.obs_connected = cached.get("obs_connected", False)
+                inst.current_video = cached.get("current_video")
+                inst.current_playlist = cached.get("current_playlist")
+                inst.uptime_seconds = cached.get("uptime_seconds", 0)
+        else:
+            # No active OSR connection → force offline regardless of DB
+            inst.status = InstanceStatus.offline
+            inst.obs_connected = False
 
     # Only owners see full API keys
     if membership.role == TeamRole.owner:

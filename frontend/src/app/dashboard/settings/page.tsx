@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -145,7 +145,7 @@ export default function SettingsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {connected && state?.status !== "offline" ? (
+          {state && state.status !== "offline" ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge
