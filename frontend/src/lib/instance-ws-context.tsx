@@ -96,7 +96,7 @@ interface InstanceWsState {
   logs: LogEntry[];
   connected: boolean;
   lastAck: { delivered: boolean; action: string } | null;
-  sendCommand: (action: string, payload?: Record<string, unknown>) => void;
+  sendCommand: (action: string, payload?: Record<string, unknown>, options?: { silent?: boolean }) => void;
 }
 
 // ── Context ──────────────────────────────────
@@ -127,6 +127,7 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
   const [lastAck, setLastAck] = useState<{ delivered: boolean; action: string } | null>(null);
 
   const lastActionRef = useRef<string>("");
+  const suppressAckToastsRef = useRef(false);
   const prevInstanceIdRef = useRef<string | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectDelay = useRef(RECONNECT_BASE_MS);
@@ -176,10 +177,12 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
             const action = lastActionRef.current.replace(/_/g, " ");
             console.log("[OSR-WS] Command ack:", { delivered, action });
             setLastAck({ delivered, action: lastActionRef.current });
-            if (delivered) {
-              toast.success(`Command sent: ${action}`);
-            } else {
-              toast.error(`Command failed: ${action} — instance offline`);
+            if (!suppressAckToastsRef.current) {
+              if (delivered) {
+                toast.success(`Command sent: ${action}`);
+              } else {
+                toast.error(`Command failed: ${action} — instance offline`);
+              }
             }
           } else if (msg.type === "error") {
             const message = msg.data?.message ?? "Unknown error";
@@ -273,7 +276,7 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
   }, [instanceId, connect]);
 
   const sendCommand = useCallback(
-    (action: string, payload: Record<string, unknown> = {}) => {
+    (action: string, payload: Record<string, unknown> = {}, options?: { silent?: boolean }) => {
       const ws = wsRef.current;
       if (!ws || ws.readyState !== WebSocket.OPEN) {
         console.warn("[OSR-WS] Cannot send command — WebSocket not open. readyState:", ws?.readyState);
@@ -282,6 +285,7 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
       const msg = JSON.stringify({ type: "command", data: { action, payload } });
       console.log("[OSR-WS] Sending command:", action, payload);
       lastActionRef.current = action;
+      if (options?.silent) suppressAckToastsRef.current = true;
       ws.send(msg);
     },
     []

@@ -645,6 +645,7 @@ export default function PlaylistsPage() {
   // ── Save: diff local vs server and send commands ──
   const handleSave = useCallback(() => {
     setSaving(true);
+    const silent = { silent: true };
     const serverMap = new Map(serverPlaylists.map((p) => [p.name, p]));
     // Build a set of server names that were renamed to something else
     const renamedFromServer = new Set(Object.values(renameMap));
@@ -653,14 +654,14 @@ export default function PlaylistsPage() {
     // 1) Send renames first (so subsequent update_playlist uses the new name)
     for (const [currentName, originalName] of Object.entries(renameMap)) {
       if (serverMap.has(originalName)) {
-        sendCommand("rename_playlist", { old_name: originalName, new_name: currentName });
+        sendCommand("rename_playlist", { old_name: originalName, new_name: currentName }, silent);
       }
     }
 
     // 2) Removed playlists — skip names that were just renamed
     for (const sp of serverPlaylists) {
       if (!localMap.has(sp.name) && !renamedFromServer.has(sp.name)) {
-        sendCommand("remove_playlist", { name: sp.name });
+        sendCommand("remove_playlist", { name: sp.name }, silent);
       }
     }
 
@@ -674,9 +675,9 @@ export default function PlaylistsPage() {
           twitch_category: lp.twitch_category,
           kick_category: lp.kick_category,
           priority: lp.priority,
-        });
+        }, silent);
         if (!lp.enabled) {
-          sendCommand("toggle_playlist", { name: lp.name, enabled: false });
+          sendCommand("toggle_playlist", { name: lp.name, enabled: false }, silent);
         }
         continue;
       }
@@ -690,7 +691,7 @@ export default function PlaylistsPage() {
 
       // Check enabled toggle
       if (lp.enabled !== sp.enabled) {
-        sendCommand("toggle_playlist", { name: lp.name, enabled: lp.enabled });
+        sendCommand("toggle_playlist", { name: lp.name, enabled: lp.enabled }, silent);
       }
 
       // Check field updates (compare against server values)
@@ -706,7 +707,7 @@ export default function PlaylistsPage() {
           twitch_category: lp.twitch_category,
           kick_category: lp.kick_category,
           priority: lp.priority,
-        });
+        }, silent);
       }
     }
 
