@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { useTeam, useMyRole } from "@/lib/team-context";
 import { useInstanceWs } from "@/lib/instance-ws-context";
 import type { OsrSettings, EnvConfig } from "@/lib/instance-ws-context";
-import { Save, Loader2, Eye, EyeOff, Lock } from "lucide-react";
+import { Save, Loader2, Eye, EyeOff, Lock, AlertTriangle } from "lucide-react";
 import {
   Tooltip,
   TooltipTrigger,
@@ -84,6 +84,29 @@ export default function SettingsPage() {
 
   // Button is enabled purely based on user edits — no delays
   const anyDirty = dirty || Object.keys(envDraft).length > 0;
+
+  // Title truncation warning — worst-case check
+  const MAX_TITLE_LENGTH = 140;
+  const titleWarning = useMemo(() => {
+    const template = draft.stream_title_template ?? "";
+    if (!template.includes("{GAMES}")) return null;
+    const playlists = state?.playlists ?? [];
+    const enabled = playlists.filter((p) => p.enabled);
+    if (enabled.length === 0) return null;
+    const maxPerRotation = Number(draft.max_playlists_per_rotation) || enabled.length;
+    const n = Math.min(maxPerRotation, enabled.length);
+    // Pick the N longest playlist names
+    const longest = [...enabled]
+      .sort((a, b) => b.name.length - a.name.length)
+      .slice(0, n)
+      .map((p) => p.name.toUpperCase());
+    const gamesStr = longest.join(" | ");
+    const worstTitle = template.replace("{GAMES}", gamesStr);
+    if (worstTitle.length > MAX_TITLE_LENGTH) {
+      return { length: worstTitle.length, preview: worstTitle };
+    }
+    return null;
+  }, [draft.stream_title_template, draft.max_playlists_per_rotation, state?.playlists]);
 
   // Sync remote settings into local draft when they arrive, but skip for
   // 3 seconds after a save to prevent stale server data from overwriting
@@ -237,14 +260,29 @@ export default function SettingsPage() {
                 label="Stream Title Template"
                 description="Use {GAMES} for playlist names. Applied each rotation."
               >
-                <Input
-                  value={draft.stream_title_template ?? ""}
-                  onChange={(e) =>
-                    updateDraft("stream_title_template", e.target.value)
-                  }
-                  disabled={!canManageContent}
-                  className="w-[400px] text-sm"
-                />
+                <div className="space-y-1.5">
+                  <Input
+                    value={draft.stream_title_template ?? ""}
+                    onChange={(e) =>
+                      updateDraft("stream_title_template", e.target.value)
+                    }
+                    disabled={!canManageContent}
+                    className="w-[400px] text-sm"
+                  />
+                  {titleWarning && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1.5 text-amber-500 text-xs cursor-help">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                          <span>Worst-case title is {titleWarning.length}/{MAX_TITLE_LENGTH} chars — playlist names may be truncated</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-md">
+                        <p className="text-xs font-mono break-all">{titleWarning.preview}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
               </SettingRow>
               <Separator />
               <SettingRow

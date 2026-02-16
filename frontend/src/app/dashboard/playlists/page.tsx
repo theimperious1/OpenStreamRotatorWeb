@@ -30,6 +30,7 @@ import {
   ToggleRight,
   Save,
   Undo2,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Tooltip,
@@ -567,6 +568,27 @@ export default function PlaylistsPage() {
 
   const hasChanges = initialized && (!playlistsEqual(localPlaylists, serverPlaylists) || Object.keys(renameMap).length > 0);
 
+  // Title truncation warning — worst-case check using local (possibly edited) playlists
+  const MAX_TITLE_LENGTH = 140;
+  const titleWarning = useMemo(() => {
+    const template = settings?.stream_title_template ?? "";
+    if (!template.includes("{GAMES}")) return null;
+    const enabled = localPlaylists.filter((p) => p.enabled);
+    if (enabled.length === 0) return null;
+    const maxPerRotation = Number(settings?.max_playlists_per_rotation) || enabled.length;
+    const n = Math.min(maxPerRotation, enabled.length);
+    const longest = [...enabled]
+      .sort((a, b) => b.name.length - a.name.length)
+      .slice(0, n)
+      .map((p) => p.name.toUpperCase());
+    const gamesStr = longest.join(" | ");
+    const worstTitle = template.replace("{GAMES}", gamesStr);
+    if (worstTitle.length > MAX_TITLE_LENGTH) {
+      return { length: worstTitle.length, preview: worstTitle };
+    }
+    return null;
+  }, [settings?.stream_title_template, settings?.max_playlists_per_rotation, localPlaylists]);
+
   // ── Local mutations (no server calls) ────────
   const handleAdd = useCallback(
     (data: PlaylistFormData) => {
@@ -765,6 +787,23 @@ export default function PlaylistsPage() {
           />
         </div>
       </div>
+
+      {/* Title Truncation Warning */}
+      {titleWarning && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-2.5 text-amber-600 dark:text-amber-400 cursor-help">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span className="text-sm">
+                Worst-case stream title is {titleWarning.length}/{MAX_TITLE_LENGTH} chars — some playlist names may be truncated
+              </span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-lg">
+            <p className="text-xs font-mono break-all">{titleWarning.preview}</p>
+          </TooltipContent>
+        </Tooltip>
+      )}
 
       {/* Unsaved Changes Bar */}
       {hasChanges && (
