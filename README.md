@@ -177,4 +177,4 @@ alembic upgrade head
 
 ## License
 
-See [LICENSE.md](LICENSE.md) for details.
+See [LICENSE](LICENSE) for details.

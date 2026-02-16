@@ -37,4 +37,4 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ## License
 
-Copyright (c) 2026 theimperious1. All rights reserved. See [LICENSE](LICENSE) for details.
+See [LICENSE](LICENSE) for details.

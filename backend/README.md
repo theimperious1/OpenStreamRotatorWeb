@@ -10,3 +10,7 @@ cp .env.example .env  # Fill in your Discord OAuth credentials
 alembic upgrade head  # Run database migrations
 uvicorn app.main:app --reload
 ```
+
+# License
+
+See [LICENSE](LICENSE) for details.
