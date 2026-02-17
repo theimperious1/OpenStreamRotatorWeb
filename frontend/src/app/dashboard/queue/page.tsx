@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -33,11 +33,13 @@ function CommandButton({
   icon: Icon,
   onClick,
   disabled,
+  loading,
 }: {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   onClick: () => void;
   disabled: boolean;
+  loading?: boolean;
 }) {
   const [sent, setSent] = useState(false);
   const handleClick = useCallback(() => {
@@ -46,17 +48,24 @@ function CommandButton({
     setTimeout(() => setSent(false), 1500);
   }, [onClick]);
 
+  const showLoading = loading && !sent;
+
   return (
     <Button
       variant="outline"
       size="sm"
       onClick={handleClick}
-      disabled={disabled || sent}
+      disabled={disabled || sent || loading}
     >
       {sent ? (
         <>
           <Check className="h-4 w-4 mr-2 text-green-500" />
           Sent!
+        </>
+      ) : showLoading ? (
+        <>
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          {label}
         </>
       ) : (
         <>
@@ -85,6 +94,42 @@ export default function QueuePage() {
   const downloadActive = state?.download_active ?? false;
   const canSkip = state?.can_skip ?? true;
   const canTriggerRotation = state?.can_trigger_rotation ?? true;
+
+  // ── Command cooldown: disable skip/rotate buttons until state reflects the change ──
+  const [cooldownState, setCooldownState] = useState<{
+    active: boolean;
+    video: string | null;
+  }>({ active: false, video: null });
+  const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Render-time adjustment: clear cooldown when current_video changes (command took effect)
+  if (
+    cooldownState.active &&
+    cooldownState.video !== null &&
+    currentVideo !== cooldownState.video
+  ) {
+    setCooldownState({ active: false, video: null });
+  }
+
+  const commandCooldown = cooldownState.active;
+
+  const startCooldown = useCallback(() => {
+    setCooldownState({ active: true, video: currentVideo });
+    if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+    cooldownTimerRef.current = setTimeout(() => {
+      setCooldownState({ active: false, video: null });
+    }, 4000);
+  }, [currentVideo]);
+
+  const handleSkip = useCallback(() => {
+    sendCommand("skip_video");
+    startCooldown();
+  }, [sendCommand, startCooldown]);
+
+  const handleTriggerRotation = useCallback(() => {
+    sendCommand("trigger_rotation");
+    startCooldown();
+  }, [sendCommand, startCooldown]);
 
   // Find the index of the currently playing video in the queue
   const currentIndex = currentVideo
@@ -152,14 +197,16 @@ export default function QueuePage() {
           <CommandButton
             label="Skip Current"
             icon={SkipForward}
-            onClick={() => sendCommand("skip_video")}
+            onClick={handleSkip}
             disabled={!instance || !connected || !canSkip || !canControl}
+            loading={commandCooldown}
           />
           <CommandButton
             label="Trigger Rotation"
             icon={RefreshCw}
-            onClick={() => sendCommand("trigger_rotation")}
+            onClick={handleTriggerRotation}
             disabled={!instance || !connected || !canTriggerRotation || !canControl}
+            loading={commandCooldown}
           />
         </div>
       </div>
@@ -189,8 +236,9 @@ export default function QueuePage() {
               <CommandButton
                 label="Skip"
                 icon={SkipForward}
-                onClick={() => sendCommand("skip_video")}
+                onClick={handleSkip}
                 disabled={!instance || !connected || !canSkip || !canControl}
+                loading={commandCooldown}
               />
             </div>
           </CardContent>
