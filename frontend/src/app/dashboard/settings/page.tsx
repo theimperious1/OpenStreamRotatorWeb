@@ -286,12 +286,12 @@ export default function SettingsPage() {
               </SettingRow>
               <Separator />
               <SettingRow
-                label="Debug Mode"
+                label="Ignore Streamer"
                 description="Ignores live detection — stream never pauses"
               >
                 <ToggleButton
-                  enabled={!!draft.debug_mode}
-                  onToggle={() => handleToggle("debug_mode")}
+                  enabled={!!draft.ignore_streamer}
+                  onToggle={() => handleToggle("ignore_streamer")}
                   disabled={!canManageContent}
                 />
               </SettingRow>

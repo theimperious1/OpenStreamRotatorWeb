@@ -361,7 +361,7 @@ export default function HelpPage() {
                   ["View logs & queue", true, true, true, true],
                   ["Watch stream preview", true, true, true, true],
                   ["Skip current video", true, true, true, false],
-                  ["Toggle debug mode", true, true, false, false],
+                  ["Toggle ignore streamer", true, true, false, false],
                   ["Manage playlists", true, true, false, false],
                   ["Trigger rotations", true, true, false, false],
                   ["Pause/resume stream", true, true, false, false],

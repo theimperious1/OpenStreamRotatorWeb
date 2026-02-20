@@ -27,7 +27,7 @@ export interface PlaylistConfig {
 
 export interface OsrSettings {
   stream_title_template?: string;
-  debug_mode?: boolean;
+  ignore_streamer?: boolean;
   notify_video_transitions?: boolean;
   min_playlists_per_rotation?: number;
   max_playlists_per_rotation?: number;
