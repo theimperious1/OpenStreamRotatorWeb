@@ -34,12 +34,14 @@ function CommandButton({
   onClick,
   disabled,
   loading,
+  disabledReason,
 }: {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   onClick: () => void;
   disabled: boolean;
   loading?: boolean;
+  disabledReason?: string;
 }) {
   const [sent, setSent] = useState(false);
   const handleClick = useCallback(() => {
@@ -49,13 +51,14 @@ function CommandButton({
   }, [onClick]);
 
   const showLoading = loading && !sent;
+  const isDisabled = disabled || sent || loading;
 
-  return (
+  const button = (
     <Button
       variant="outline"
       size="sm"
       onClick={handleClick}
-      disabled={disabled || sent || loading}
+      disabled={isDisabled}
     >
       {sent ? (
         <>
@@ -75,6 +78,19 @@ function CommandButton({
       )}
     </Button>
   );
+
+  if (isDisabled && disabledReason) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-not-allowed">{button}</span>
+        </TooltipTrigger>
+        <TooltipContent>{disabledReason}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return button;
 }
 
 export default function QueuePage() {
@@ -112,6 +128,35 @@ export default function QueuePage() {
   }
 
   const commandCooldown = cooldownState.active;
+
+  // Compute disabled reasons for command buttons
+  const skipDisabledReason = !instance
+    ? "No instance selected"
+    : !connected
+      ? "Not connected"
+      : !canControl
+        ? "Insufficient permissions"
+        : !canSkip
+          ? downloadActive
+            ? "Next rotation is downloading"
+            : "No videos to skip"
+          : commandCooldown
+            ? "Processing..."
+            : undefined;
+
+  const rotationDisabledReason = !instance
+    ? "No instance selected"
+    : !connected
+      ? "Not connected"
+      : !canControl
+        ? "Insufficient permissions"
+        : !canTriggerRotation
+          ? downloadActive
+            ? "Next rotation is downloading"
+            : "A rotation is already in progress"
+          : commandCooldown
+            ? "Processing..."
+            : undefined;
 
   const startCooldown = useCallback(() => {
     setCooldownState({ active: true, video: currentVideo });
@@ -200,6 +245,7 @@ export default function QueuePage() {
             onClick={handleSkip}
             disabled={!instance || !connected || !canSkip || !canControl}
             loading={commandCooldown}
+            disabledReason={skipDisabledReason}
           />
           <CommandButton
             label="Trigger Rotation"
@@ -207,6 +253,7 @@ export default function QueuePage() {
             onClick={handleTriggerRotation}
             disabled={!instance || !connected || !canTriggerRotation || !canControl}
             loading={commandCooldown}
+            disabledReason={rotationDisabledReason}
           />
         </div>
       </div>
@@ -239,6 +286,7 @@ export default function QueuePage() {
                 onClick={handleSkip}
                 disabled={!instance || !connected || !canSkip || !canControl}
                 loading={commandCooldown}
+                disabledReason={skipDisabledReason}
               />
             </div>
           </CardContent>
