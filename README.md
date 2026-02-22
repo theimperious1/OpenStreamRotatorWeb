@@ -79,9 +79,12 @@ The frontend will be available at `http://localhost:3000` and the backend at `ht
 git clone https://github.com/theimperious1/OpenStreamRotatorWeb.git
 cd OpenStreamRotatorWeb
 cp backend/.env.example backend/.env
-# Edit backend/.env with your Discord app credentials and a random JWT secret
+# Edit backend/.env with your Discord app credentials
+# (JWT_SECRET is auto-generated, DATABASE_URL is overridden to use the Postgres container)
 docker compose up
 ```
+
+Docker Compose starts three services: a PostgreSQL database, the FastAPI backend (with auto-migrations), and the Next.js frontend. The `DATABASE_URL` is automatically set to the Postgres container — no manual database setup needed.
 
 The frontend will be available at `http://localhost:3000` and the backend at `http://localhost:8000`.
 
