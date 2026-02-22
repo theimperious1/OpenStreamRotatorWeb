@@ -38,7 +38,42 @@ Web dashboard for [OpenStreamRotator](https://github.com/theimperious1/OpenStrea
 
 ## Installation
 
-### With Docker (recommended)
+### Quick Setup (recommended)
+
+The interactive setup script walks you through Discord OAuth, database, and all other options:
+
+```bash
+git clone https://github.com/theimperious1/OpenStreamRotatorWeb.git
+cd OpenStreamRotatorWeb
+```
+
+**Windows:**
+```bash
+setup.bat
+```
+
+**Linux/Mac:**
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+The script creates your `.env`, installs dependencies, and runs database migrations. Then start both services:
+
+**Windows:**
+```bash
+run.bat
+```
+
+**Linux/Mac:**
+```bash
+chmod +x run.sh
+./run.sh
+```
+
+The frontend will be available at `http://localhost:3000` and the backend at `http://localhost:8000`.
+
+### With Docker
 
 ```bash
 git clone https://github.com/theimperious1/OpenStreamRotatorWeb.git
@@ -84,7 +119,7 @@ The frontend auto-detects the backend at the same hostname on port 8000. To over
 | `DISCORD_CLIENT_ID` | Yes | — | Discord application client ID |
 | `DISCORD_CLIENT_SECRET` | Yes | — | Discord application client secret |
 | `DISCORD_REDIRECT_URI` | No | `http://localhost:8000/auth/discord/callback` | OAuth callback URL |
-| `JWT_SECRET` | Yes | — | Random secret for signing JWTs |
+| `JWT_SECRET` | No | *auto-generated* | Random secret for signing JWTs (auto-generated on first start if not set) |
 | `JWT_ALGORITHM` | No | `HS256` | JWT signing algorithm |
 | `JWT_EXPIRY_HOURS` | No | `72` | Token lifetime in hours |
 | `DATABASE_URL` | No | `sqlite+aiosqlite:///./osr_web.db` | Database connection string |
