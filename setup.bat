@@ -14,6 +14,35 @@ echo  ==========================================
 echo.
 
 :: ----------------------------------------------------------
+:: Pre-flight: check for Node.js and npm
+:: ----------------------------------------------------------
+where node >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo  ERROR: Node.js is not installed or not in your PATH.
+    echo.
+    echo  The frontend requires Node.js to build and run.
+    echo  Download it from: https://nodejs.org/
+    echo.
+    echo  After installing, close this terminal, open a new one, and run setup.bat again.
+    echo.
+    pause
+    exit /b 1
+)
+where npm >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo  ERROR: npm is not found in your PATH.
+    echo.
+    echo  Node.js appears to be installed but npm is missing.
+    echo  Try reinstalling Node.js from https://nodejs.org/ with the default options.
+    echo  Then close this terminal, open a new one, and run setup.bat again.
+    echo.
+    pause
+    exit /b 1
+)
+echo  [OK] Node.js and npm found.
+echo.
+
+:: ----------------------------------------------------------
 :: Check if .env already exists
 :: ----------------------------------------------------------
 if not exist "backend\.env" goto :INIT_DEFAULTS

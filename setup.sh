@@ -14,6 +14,29 @@ echo " =========================================="
 echo ""
 
 # ----------------------------------------------------------
+# Pre-flight: check for Node.js and npm
+# ----------------------------------------------------------
+if ! command -v node &>/dev/null; then
+    echo " ERROR: Node.js is not installed or not in your PATH."
+    echo ""
+    echo " The frontend requires Node.js to build and run."
+    echo " Install it from: https://nodejs.org/"
+    echo " Or use your package manager: sudo apt install nodejs npm"
+    echo ""
+    exit 1
+fi
+if ! command -v npm &>/dev/null; then
+    echo " ERROR: npm is not found in your PATH."
+    echo ""
+    echo " Node.js appears to be installed but npm is missing."
+    echo " Try: sudo apt install npm  (or reinstall Node.js)"
+    echo ""
+    exit 1
+fi
+echo " [OK] Node.js and npm found."
+echo ""
+
+# ----------------------------------------------------------
 # Helpers
 # ----------------------------------------------------------
 ask() {
