@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getMe, type User } from "@/lib/api";
+import { getMe, ApiError, type User } from "@/lib/api";
 
 interface AuthState {
   user: User | null;
@@ -39,10 +39,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const me = await getMe();
       setUser(me);
-    } catch {
-      // Token expired or invalid
-      localStorage.removeItem("osr_token");
-      setUser(null);
+    } catch (err) {
+      // Only clear the token on auth failures (401/403).
+      // Network errors or server errors should NOT log the user out.
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        localStorage.removeItem("osr_token");
+        setUser(null);
+      }
+      // For other errors, keep the existing user state (may be null on
+      // first load, but won't nuke a valid session on a transient failure).
     } finally {
       setLoading(false);
     }

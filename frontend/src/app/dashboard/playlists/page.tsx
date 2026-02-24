@@ -41,6 +41,22 @@ import { toast } from "sonner";
 
 // ── Helpers ──────────────────────────────────
 
+/** Format a UTC timestamp string into a human-readable relative time. */
+function formatLastPlayed(isoString: string | null | undefined): string {
+  if (!isoString) return "Never";
+  const then = new Date(isoString + (isoString.endsWith("Z") ? "" : "Z")); // ensure UTC
+  const diff = Date.now() - then.getTime();
+  if (diff < 0) return "Just now";
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `${days}d ${hours % 24}h ago`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  return "Just now";
+}
+
 /** Convert youtube.com/watch?v=...&list=... → youtube.com/playlist?list=... */
 function normalizePlaylistUrl(url: string): string {
   try {
@@ -451,6 +467,11 @@ function PlaylistCard({
             </TooltipTrigger>
             <TooltipContent>Higher priority playlists are preferred during rotation</TooltipContent>
           </Tooltip>
+        </div>
+        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+          <span>Last played: {formatLastPlayed(playlist.last_played)}</span>
+          <span>·</span>
+          <span>Play count: {playlist.play_count ?? 0}</span>
         </div>
         <a
           href={playlist.url}

@@ -23,6 +23,8 @@ export interface PlaylistConfig {
   kick_category: string;
   enabled: boolean;
   priority: number;
+  last_played: string | null;
+  play_count: number;
 }
 
 export interface OsrSettings {
