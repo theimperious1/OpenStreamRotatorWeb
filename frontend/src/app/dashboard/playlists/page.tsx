@@ -591,10 +591,13 @@ function PlaylistCard({
 
 // ── Page ─────────────────────────────────────
 
-/** Deep-compare two playlist arrays by serialising to JSON. */
+/** Deep-compare two playlist arrays ignoring read-only stats (last_played, play_count). */
 function playlistsEqual(a: PlaylistConfig[], b: PlaylistConfig[]): boolean {
   if (a.length !== b.length) return false;
-  return JSON.stringify(a) === JSON.stringify(b);
+  // Compare only editable fields — stats are server-managed and should never
+  // trigger the "unsaved changes" banner.
+  const strip = ({ last_played, play_count, ...rest }: PlaylistConfig) => rest;
+  return JSON.stringify(a.map(strip)) === JSON.stringify(b.map(strip));
 }
 
 export default function PlaylistsPage() {
@@ -666,7 +669,17 @@ export default function PlaylistsPage() {
       if (playlistsEqual(prev.playlists, serverPlaylists) && Object.keys(prev.renameMap).length === 0) {
         return { ...base, playlists: serverPlaylists };
       }
-      return base;
+      // User has pending edits — merge fresh stats (last_played, play_count)
+      // from the server into local playlists so dashboard numbers stay current.
+      const statsMap = new Map(serverPlaylists.map((p) => [p.name, { last_played: p.last_played, play_count: p.play_count }]));
+      const merged = prev.playlists.map((lp) => {
+        const fresh = statsMap.get(lp.name);
+        if (fresh && (lp.last_played !== fresh.last_played || lp.play_count !== fresh.play_count)) {
+          return { ...lp, last_played: fresh.last_played, play_count: fresh.play_count };
+        }
+        return lp;
+      });
+      return { ...base, playlists: merged };
     });
   }
 
