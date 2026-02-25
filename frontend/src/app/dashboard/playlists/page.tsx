@@ -74,6 +74,23 @@ function normalizePlaylistUrl(url: string): string {
   return url;
 }
 
+/** Check whether a non-empty string is a valid HTTP(S) URL. */
+function isValidUrl(str: string): boolean {
+  try {
+    const url = new URL(str.trim());
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/** Detect if a string looks like a pasted URL (for category / name fields). */
+function looksLikeUrl(str: string): boolean {
+  const t = str.trim().toLowerCase();
+  if (!t) return false;
+  return /^https?:\/\//.test(t) || /^www\./.test(t);
+}
+
 /** Button that shows brief "Sent!" feedback after click. */
 function CommandButton({
   label,
@@ -134,13 +151,24 @@ const emptyForm: PlaylistFormData = {
 };
 
 function AddPlaylistForm({
+  allNames,
   onSubmit,
   onCancel,
 }: {
+  allNames: string[];
   onSubmit: (data: PlaylistFormData) => void;
   onCancel: () => void;
 }) {
   const [form, setForm] = useState<PlaylistFormData>(emptyForm);
+
+  const nameConflict =
+    form.name.trim() !== "" &&
+    allNames.some((n) => n.toLowerCase() === form.name.trim().toLowerCase());
+  const urlInvalid = form.url.trim() !== "" && !isValidUrl(form.url);
+  const nameIsUrl = looksLikeUrl(form.name);
+  const twitchIsUrl = looksLikeUrl(form.twitch_category);
+  const kickIsUrl = looksLikeUrl(form.kick_category);
+  const hasValidationError = urlInvalid || nameIsUrl || twitchIsUrl || kickIsUrl || nameConflict;
 
   return (
     <Card>
@@ -151,20 +179,40 @@ function AddPlaylistForm({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">
+            Name
+          </label>
+          <Input
+            placeholder="e.g. MUSIC"
+            value={form.name}
+            onChange={(e) =>
+              setForm((p) => ({ ...p, name: e.target.value }))
+            }
+            className={`text-sm ${nameConflict || nameIsUrl ? "border-red-500" : ""}`}
+          />
+          {nameConflict && (
+            <p className="text-xs text-red-500 mt-1">A playlist with this name already exists</p>
+          )}
+          {nameIsUrl && (
+            <p className="text-xs text-red-500 mt-1">Name should not be a URL</p>
+          )}
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">
+            YouTube Playlist URL
+          </label>
+          <Input
+            placeholder="https://www.youtube.com/playlist?list=..."
+            value={form.url}
+            onChange={(e) => setForm((p) => ({ ...p, url: normalizePlaylistUrl(e.target.value) }))}
+            className={`text-sm ${urlInvalid ? "border-red-500" : ""}`}
+          />
+          {urlInvalid && (
+            <p className="text-xs text-red-500 mt-1">Enter a valid URL (https://...)</p>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-muted-foreground mb-1 block">
-              Name
-            </label>
-            <Input
-              placeholder="e.g. MUSIC"
-              value={form.name}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, name: e.target.value }))
-              }
-              className="text-sm"
-            />
-          </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">
               Twitch Category
@@ -175,11 +223,12 @@ function AddPlaylistForm({
               onChange={(e) =>
                 setForm((p) => ({ ...p, twitch_category: e.target.value }))
               }
-              className="text-sm"
+              className={`text-sm ${twitchIsUrl ? "border-red-500" : ""}`}
             />
+            {twitchIsUrl && (
+              <p className="text-xs text-red-500 mt-1">Category should not be a URL</p>
+            )}
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">
               Kick Category{" "}
@@ -191,21 +240,12 @@ function AddPlaylistForm({
               onChange={(e) =>
                 setForm((p) => ({ ...p, kick_category: e.target.value }))
               }
-              className="text-sm"
+              className={`text-sm ${kickIsUrl ? "border-red-500" : ""}`}
             />
+            {kickIsUrl && (
+              <p className="text-xs text-red-500 mt-1">Category should not be a URL</p>
+            )}
           </div>
-          <div />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">
-            YouTube Playlist URL
-          </label>
-          <Input
-            placeholder="https://www.youtube.com/playlist?list=..."
-            value={form.url}
-            onChange={(e) => setForm((p) => ({ ...p, url: normalizePlaylistUrl(e.target.value) }))}
-            className="text-sm"
-          />
         </div>
         <div className="flex items-center gap-3">
           <div className="w-24">
@@ -233,7 +273,7 @@ function AddPlaylistForm({
             <Button
               size="sm"
               onClick={() => onSubmit(form)}
-              disabled={!form.name.trim() || !form.url.trim()}
+              disabled={!form.name.trim() || !form.url.trim() || hasValidationError}
             >
               <Plus className="h-4 w-4 mr-1" />
               Add Playlist
@@ -272,6 +312,11 @@ function EditPlaylistForm({
     allNames.some(
       (n) => n.toLowerCase() === form.name.trim().toLowerCase()
     );
+  const urlInvalid = form.url.trim() !== "" && !isValidUrl(form.url);
+  const nameIsUrl = looksLikeUrl(form.name);
+  const twitchIsUrl = looksLikeUrl(form.twitch_category);
+  const kickIsUrl = looksLikeUrl(form.kick_category);
+  const hasValidationError = urlInvalid || nameIsUrl || twitchIsUrl || kickIsUrl || nameConflict;
 
   return (
     <Card className="border-yellow-500/30">
@@ -299,21 +344,27 @@ function EditPlaylistForm({
           <Input
             value={form.name}
             onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-            className={`text-sm ${nameConflict ? "border-red-500" : ""}`}
+            className={`text-sm ${nameConflict || nameIsUrl ? "border-red-500" : ""}`}
           />
           {nameConflict && (
             <p className="text-xs text-red-500 mt-1">A playlist with this name already exists</p>
           )}
+          {nameIsUrl && (
+            <p className="text-xs text-red-500 mt-1">Name should not be a URL</p>
+          )}
         </div>
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">
-            URL
+            YouTube Playlist URL
           </label>
           <Input
             value={form.url}
             onChange={(e) => setForm((p) => ({ ...p, url: normalizePlaylistUrl(e.target.value) }))}
-            className="text-sm"
+            className={`text-sm ${urlInvalid ? "border-red-500" : ""}`}
           />
+          {urlInvalid && (
+            <p className="text-xs text-red-500 mt-1">Enter a valid URL (https://...)</p>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
@@ -325,8 +376,11 @@ function EditPlaylistForm({
               onChange={(e) =>
                 setForm((p) => ({ ...p, twitch_category: e.target.value }))
               }
-              className="text-sm"
+              className={`text-sm ${twitchIsUrl ? "border-red-500" : ""}`}
             />
+            {twitchIsUrl && (
+              <p className="text-xs text-red-500 mt-1">Category should not be a URL</p>
+            )}
           </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">
@@ -337,12 +391,15 @@ function EditPlaylistForm({
               onChange={(e) =>
                 setForm((p) => ({ ...p, kick_category: e.target.value }))
               }
-              className="text-sm"
+              className={`text-sm ${kickIsUrl ? "border-red-500" : ""}`}
             />
+            {kickIsUrl && (
+              <p className="text-xs text-red-500 mt-1">Category should not be a URL</p>
+            )}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
+        <div className="flex items-center gap-3">
+          <div className="w-24">
             <label className="text-xs text-muted-foreground mb-1 block">
               Priority
             </label>
@@ -360,18 +417,18 @@ function EditPlaylistForm({
               className="text-sm text-center"
             />
           </div>
-        </div>
-        <div className="flex justify-end gap-2 pt-1">
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            disabled={nameConflict || form.name.trim() === ""}
-            onClick={() => onSave({ ...form, name: form.name.trim() })}
-          >
-            Save
-          </Button>
+          <div className="flex items-center gap-2 ml-auto pt-5">
+            <Button variant="ghost" size="sm" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={hasValidationError || form.name.trim() === "" || form.url.trim() === ""}
+              onClick={() => onSave({ ...form, name: form.name.trim() })}
+            >
+              Save
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -933,6 +990,7 @@ export default function PlaylistsPage() {
       {/* Add Form */}
       {showAddForm && (
         <AddPlaylistForm
+          allNames={localPlaylists.map((p) => p.name)}
           onSubmit={handleAdd}
           onCancel={() => setShowAddForm(false)}
         />
