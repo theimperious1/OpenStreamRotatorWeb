@@ -306,6 +306,26 @@ export default function SettingsPage() {
                   disabled={!canManageContent}
                 />
               </SettingRow>
+              <Separator />
+              <SettingRow
+                label="Live Check Interval"
+                description="How often to check if the streamer is live (seconds, minimum 5)"
+              >
+                <Input
+                  type="number"
+                  value={draft.live_check_interval_seconds ?? 30}
+                  onChange={(e) =>
+                    updateDraft(
+                      "live_check_interval_seconds",
+                      Math.max(parseInt(e.target.value) || 5, 5)
+                    )
+                  }
+                  min={5}
+                  max={300}
+                  disabled={!canManageContent}
+                  className="w-20 text-sm text-center"
+                />
+              </SettingRow>
             </CardContent>
           </Card>
 

@@ -37,6 +37,7 @@ export interface OsrSettings {
   yt_dlp_use_cookies?: boolean;
   yt_dlp_browser_for_cookies?: string;
   yt_dlp_verbose?: boolean;
+  live_check_interval_seconds?: number;
 }
 
 export interface Connections {
