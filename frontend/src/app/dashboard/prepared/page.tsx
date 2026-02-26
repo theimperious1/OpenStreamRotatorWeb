@@ -46,6 +46,7 @@ import {
   FolderClock,
   Ban,
   Clock,
+  Undo2,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -230,6 +231,15 @@ function PreparedRotationCard({
   sendCommand: (action: string, payload?: Record<string, unknown>) => void;
 }) {
   const [showScheduler, setShowScheduler] = useState(false);
+  const [restoreCursor, setRestoreCursor] = useState(false);
+
+  const handleExecute = useCallback(() => {
+    sendCommand("execute_prepared_rotation", {
+      slug: rotation.slug,
+      restore_cursor: restoreCursor,
+    });
+    setRestoreCursor(false);
+  }, [sendCommand, rotation.slug, restoreCursor]);
 
   const actions = (() => {
     const s = rotation.status;
@@ -274,11 +284,7 @@ function PreparedRotationCard({
           label="Execute Now"
           icon={Play}
           variant="default"
-          onClick={() =>
-            sendCommand("execute_prepared_rotation", {
-              slug: rotation.slug,
-            })
-          }
+          onClick={handleExecute}
           disabled={!connected || !canManageContent}
         />
       );
@@ -302,11 +308,7 @@ function PreparedRotationCard({
           label="Execute Now"
           icon={Play}
           variant="default"
-          onClick={() =>
-            sendCommand("execute_prepared_rotation", {
-              slug: rotation.slug,
-            })
-          }
+          onClick={handleExecute}
           disabled={!connected || !canManageContent}
         />
       );
@@ -389,6 +391,28 @@ function PreparedRotationCard({
         )}
 
         <div className="flex flex-wrap items-center gap-2">{actions}</div>
+
+        {(rotation.status === "ready" || rotation.status === "scheduled" || rotation.status === "completed") && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setRestoreCursor((v) => !v)}
+                disabled={!canManageContent}
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+                Resume where I left off:
+                <span className={restoreCursor ? "text-green-500 font-medium" : "text-muted-foreground font-medium"}>
+                  {restoreCursor ? "Yes" : "No"}
+                </span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              When enabled, restores the live video position after this rotation finishes
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         {showScheduler && (rotation.status === "ready" || rotation.status === "completed") && (
           <SchedulePicker
