@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Radio, Loader2, AlertCircle, CheckCircle2, Users } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
-  owner: "Owner",
+  owner: "Admin",
   content_manager: "Content Manager",
   moderator: "Moderator",
   viewer: "Viewer",

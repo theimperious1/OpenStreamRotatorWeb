@@ -1,12 +1,20 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { getApiBase } from "@/lib/api";
+import { getApiBase, getRegistrationInfo } from "@/lib/api";
 import Image from "next/image";
+import { ShieldAlert } from "lucide-react";
 
 export default function HomePage() {
   const apiBase = useMemo(() => getApiBase(), []);
+  const [inviteOnly, setInviteOnly] = useState(false);
+
+  useEffect(() => {
+    getRegistrationInfo()
+      .then((info) => setInviteOnly(!info.public_registration))
+      .catch(() => {}); // If endpoint unreachable, assume open
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
@@ -49,6 +57,16 @@ export default function HomePage() {
               run it yourself via CLI
             </a>
           </p>
+
+          {inviteOnly && (
+            <div className="flex items-center justify-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-sm text-yellow-600 dark:text-yellow-400">
+              <ShieldAlert className="h-4 w-4 shrink-0" />
+              <span>
+                This instance is invite-only. New accounts require an invite
+                link from a team owner.
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

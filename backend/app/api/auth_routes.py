@@ -2,15 +2,17 @@
 
 import json
 import base64
+import re
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db
-from app.models import User
+from app.models import User, TeamInvite, InviteStatus
 from app.schemas import TokenResponse, UserOut
 from app.auth import (
     get_discord_login_url,
@@ -50,7 +52,8 @@ async def discord_login(request: Request, redirect: str | None = None, origin: s
 
 @router.get("/discord/callback", response_model=TokenResponse)
 async def discord_callback(
-    code: str,
+    code: str | None = None,
+    error: str | None = None,
     state: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
@@ -73,6 +76,12 @@ async def discord_callback(
                 redirect_path = state_data["redirect"]
         except Exception:
             pass  # Fall back to default frontend_url
+
+    # Handle OAuth denial (user clicked Cancel on Discord)
+    if error or not code:
+        return RedirectResponse(
+            f"{frontend_origin}/auth/callback?error={error or 'access_denied'}"
+        )
     
     try:
         token_data = await exchange_code(code)
@@ -94,6 +103,36 @@ async def discord_callback(
     user = result.scalar_one_or_none()
 
     if user is None:
+        # -- Closed-registration gate --
+        if not settings.allow_public_registration:
+            # Always allow the very first user (initial setup)
+            user_count = (await db.execute(select(func.count(User.id)))).scalar() or 0
+
+            # Validate the invite code from the redirect path (e.g. /invite/abc123)
+            has_valid_invite = False
+            if redirect_path:
+                match = re.match(r"^/invite/([A-Za-z0-9_-]+)$", redirect_path)
+                if match:
+                    invite_code = match.group(1)
+                    invite_result = await db.execute(
+                        select(TeamInvite).where(
+                            TeamInvite.code == invite_code,
+                            TeamInvite.status == InviteStatus.pending,
+                        )
+                    )
+                    invite = invite_result.scalar_one_or_none()
+                    if invite is not None:
+                        now = datetime.now(timezone.utc)
+                        not_expired = invite.expires_at is None or invite.expires_at > now
+                        not_maxed = invite.max_uses == 0 or invite.use_count < invite.max_uses
+                        has_valid_invite = not_expired and not_maxed
+
+            if user_count > 0 and not has_valid_invite:
+                # Block new registration — redirect to frontend with error
+                return RedirectResponse(
+                    f"{frontend_origin}/auth/callback?error=registration_closed"
+                )
+
         user = User(discord_id=discord_id, discord_username=username, discord_avatar=avatar_url)
         db.add(user)
     else:
@@ -118,3 +157,10 @@ async def discord_callback(
 async def get_me(user: User = Depends(get_current_user)):
     """Return the currently authenticated user."""
     return user
+
+
+@router.get("/registration-info")
+async def registration_info():
+    """Return public registration settings so the frontend can adapt its UI."""
+    settings = get_settings()
+    return {"public_registration": settings.allow_public_registration}

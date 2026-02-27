@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     # Frontend
     frontend_url: str = "http://localhost:3000"
 
+    # Registration — when False, only users with an invite link can register
+    allow_public_registration: bool = False
+
     # CORS — comma-separated origins, or "*" for all
     allowed_origins: str = ""
 

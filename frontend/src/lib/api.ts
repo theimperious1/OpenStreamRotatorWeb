@@ -120,6 +120,14 @@ export async function getMe(): Promise<User> {
   return apiFetch<User>("/auth/me");
 }
 
+export interface RegistrationInfo {
+  public_registration: boolean;
+}
+
+export async function getRegistrationInfo(): Promise<RegistrationInfo> {
+  return apiFetch<RegistrationInfo>("/auth/registration-info");
+}
+
 // ── Teams ────────────────────────────────────
 
 export async function listTeams(): Promise<Team[]> {

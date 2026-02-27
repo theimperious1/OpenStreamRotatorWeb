@@ -16,6 +16,9 @@ export default function AuthCallbackPage() {
   // Derive error state from search params (no setState in effect)
   const token = searchParams.get("token");
   const redirectPath = searchParams.get("redirect");
+  const errorParam = searchParams.get("error");
+  const isRegistrationClosed = errorParam === "registration_closed";
+  const isAccessDenied = errorParam === "access_denied";
   const hasError = !token;
 
   useEffect(() => {
@@ -43,7 +46,13 @@ export default function AuthCallbackPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-center gap-2 text-red-500">
               <AlertCircle className="h-5 w-5" />
-              <p className="text-sm">No token received from Discord. Please try signing in again.</p>
+              <p className="text-sm">
+                {isRegistrationClosed
+                  ? "Registration is invite-only. You need an invite link from an existing team owner to join this instance."
+                  : isAccessDenied
+                  ? "Discord sign-in was cancelled. No account was created or modified."
+                  : "No token received from Discord. Please try signing in again."}
+              </p>
             </div>
             <Link
               href="/"

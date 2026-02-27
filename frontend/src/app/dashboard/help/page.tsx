@@ -125,6 +125,7 @@ const features: FeatureItem[] = [
       "Uptime tracks how long OSR has been running since its last restart.",
       "Connections shows OBS WebSocket and Web Dashboard connectivity status.",
       "Recent Activity shows the latest log entries streamed from OSR in real-time.",
+      "When fallback mode is active, the dashboard shows a Fallback Mode indicator and the currently playing fallback content instead of normal rotation info.",
     ],
   },
   {
@@ -167,6 +168,8 @@ const features: FeatureItem[] = [
       "Executing a rotation downloads the selected playlists' videos and swaps them into the live rotation.",
       "Status badges: Created → Downloading → Ready → Executing → Completed.",
       "Use this to pre-plan content blocks (e.g., \"Morning Music\" → \"Afternoon Gaming\").",
+      "Scheduled rotations activate automatically at the configured date/time.",
+      "Prepared rotations can be marked as fallback rotations — if all normal downloads fail, OSR cycles through the ones you've designated as fallback to keep the stream running.",
     ],
   },
   {
@@ -278,6 +281,16 @@ const faqs: FaqItem[] = [
     question: "How do I report a bug?",
     answer:
       "Check the Logs page for error messages that might explain the issue. If you need to report a bug, note the error message, what you were doing when it happened, and your OSR version. You can file an issue on the project's GitHub repository.",
+  },
+  {
+    question: "What is Fallback Mode?",
+    answer:
+      "Fallback mode activates automatically when OSR cannot download any new content after repeated failures. It cycles through prepared rotations you've explicitly marked as fallback to keep the stream running with previously downloaded videos. If no fallback rotations are configured, OSR displays the pause screen instead. Once fresh content downloads successfully, fallback mode deactivates and normal rotation resumes. Fallback plays do not affect playlist play counts or selection stats.",
+  },
+  {
+    question: "What happens if all my prepared rotations are exhausted during fallback?",
+    answer:
+      "OSR cycles back to the first fallback rotation and keeps looping through them. If you haven't marked any prepared rotations as fallback, it falls back to the pause screen. In either case, OSR keeps retrying downloads in the background and will automatically return to normal operation once content is available again.",
   },
 ];
 
