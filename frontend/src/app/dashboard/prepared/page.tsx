@@ -47,6 +47,8 @@ import {
   Ban,
   Clock,
   Undo2,
+  ShieldAlert,
+  Shield,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -223,23 +225,59 @@ function PreparedRotationCard({
   connected,
   canManageContent,
   sendCommand,
+  fallbackActive,
 }: {
   rotation: PreparedRotation;
   anyDownloading: boolean;
   connected: boolean;
   canManageContent: boolean;
   sendCommand: (action: string, payload?: Record<string, unknown>) => void;
+  fallbackActive: boolean;
 }) {
   const [showScheduler, setShowScheduler] = useState(false);
   const [restoreCursor, setRestoreCursor] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmExecute, setConfirmExecute] = useState(false);
+  const [optimisticFallback, setOptimisticFallback] = useState<boolean | null>(null);
+
+  // Reset optimistic state when server catches up
+  const isFallback = optimisticFallback ?? rotation.is_fallback;
+  useEffect(() => {
+    if (optimisticFallback !== null && rotation.is_fallback === optimisticFallback) {
+      setOptimisticFallback(null);
+    }
+  }, [rotation.is_fallback, optimisticFallback]);
 
   const handleExecute = useCallback(() => {
+    if (isFallback && !confirmExecute) {
+      setConfirmExecute(true);
+      return;
+    }
     sendCommand("execute_prepared_rotation", {
       slug: rotation.slug,
       restore_cursor: restoreCursor,
     });
     setRestoreCursor(false);
-  }, [sendCommand, rotation.slug, restoreCursor]);
+    setConfirmExecute(false);
+  }, [sendCommand, rotation.slug, isFallback, restoreCursor, confirmExecute]);
+
+  const handleDelete = useCallback(() => {
+    if (isFallback && !confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    sendCommand("delete_prepared_rotation", { slug: rotation.slug });
+    setConfirmDelete(false);
+  }, [sendCommand, rotation.slug, isFallback, confirmDelete]);
+
+  const handleToggleFallback = useCallback(() => {
+    const newValue = !isFallback;
+    setOptimisticFallback(newValue);
+    sendCommand("toggle_prepared_fallback", {
+      slug: rotation.slug,
+      is_fallback: newValue,
+    });
+  }, [sendCommand, rotation.slug, isFallback]);
 
   const actions = (() => {
     const s = rotation.status;
@@ -278,16 +316,41 @@ function PreparedRotationCard({
     }
 
     if (s === "ready" || s === "completed") {
-      btns.push(
-        <ActionButton
-          key="execute"
-          label="Execute Now"
-          icon={Play}
-          variant="default"
-          onClick={handleExecute}
-          disabled={!connected || !canManageContent}
-        />
-      );
+      if (confirmExecute) {
+        btns.push(
+          <ActionButton
+            key="execute"
+            label="Confirm Execute"
+            icon={Play}
+            variant="default"
+            onClick={handleExecute}
+            disabled={!connected || !canManageContent}
+          />
+        );
+        btns.push(
+          <Button
+            key="cancel-execute"
+            variant="ghost"
+            size="sm"
+            onClick={() => setConfirmExecute(false)}
+          >
+            Cancel
+          </Button>
+        );
+      } else {
+        btns.push(
+          <Button
+            key="execute"
+            variant="default"
+            size="sm"
+            onClick={handleExecute}
+            disabled={!connected || !canManageContent}
+          >
+            <Play className="h-4 w-4 mr-1" />
+            Execute Now
+          </Button>
+        );
+      }
       btns.push(
         <Button
           key="schedule"
@@ -302,16 +365,41 @@ function PreparedRotationCard({
     }
 
     if (s === "scheduled") {
-      btns.push(
-        <ActionButton
-          key="execute-now"
-          label="Execute Now"
-          icon={Play}
-          variant="default"
-          onClick={handleExecute}
-          disabled={!connected || !canManageContent}
-        />
-      );
+      if (confirmExecute) {
+        btns.push(
+          <ActionButton
+            key="execute-now"
+            label="Confirm Execute"
+            icon={Play}
+            variant="default"
+            onClick={handleExecute}
+            disabled={!connected || !canManageContent}
+          />
+        );
+        btns.push(
+          <Button
+            key="cancel-execute-sched"
+            variant="ghost"
+            size="sm"
+            onClick={() => setConfirmExecute(false)}
+          >
+            Cancel
+          </Button>
+        );
+      } else {
+        btns.push(
+          <Button
+            key="execute-now"
+            variant="default"
+            size="sm"
+            onClick={handleExecute}
+            disabled={!connected || !canManageContent}
+          >
+            <Play className="h-4 w-4 mr-1" />
+            Execute Now
+          </Button>
+        );
+      }
       btns.push(
         <ActionButton
           key="cancel-sched"
@@ -328,33 +416,65 @@ function PreparedRotationCard({
     }
 
     if (s !== "executing") {
-      btns.push(
-        <ActionButton
-          key="delete"
-          label="Delete"
-          icon={Trash2}
-          variant="destructive"
-          onClick={() =>
-            sendCommand("delete_prepared_rotation", {
-              slug: rotation.slug,
-            })
-          }
-          disabled={!connected || !canManageContent}
-        />
-      );
+      if (confirmDelete) {
+        btns.push(
+          <ActionButton
+            key="delete"
+            label="Confirm Delete"
+            icon={Trash2}
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={!connected || !canManageContent}
+          />
+        );
+        btns.push(
+          <Button
+            key="cancel-delete"
+            variant="ghost"
+            size="sm"
+            onClick={() => setConfirmDelete(false)}
+          >
+            Cancel
+          </Button>
+        );
+      } else {
+        btns.push(
+          <Button
+            key="delete"
+            variant="destructive"
+            size="sm"
+            onClick={handleDelete}
+            disabled={!connected || !canManageContent}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Delete
+          </Button>
+        );
+      }
     }
 
     return btns;
   })();
 
   return (
-    <Card>
+    <Card className={isFallback ? "border-orange-500/40" : undefined}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FolderClock className="h-4 w-4 text-muted-foreground" />
             <CardTitle className="text-base">{rotation.title}</CardTitle>
             <StatusBadge status={rotation.status} />
+            {isFallback && (
+              <Badge variant="outline" className="text-orange-500 border-orange-500/30">
+                <ShieldAlert className="h-3 w-3 mr-1" />
+                Fallback
+              </Badge>
+            )}
+            {fallbackActive && isFallback && (
+              <Badge variant="secondary" className="text-orange-400 animate-pulse">
+                Active
+              </Badge>
+            )}
           </div>
           <span className="text-xs text-muted-foreground">
             {rotation.video_count} video{rotation.video_count !== 1 ? "s" : ""}
@@ -386,33 +506,87 @@ function PreparedRotationCard({
         {rotation.status === "executing" && (
           <div className="flex items-center gap-2 text-sm text-green-500">
             <Play className="h-4 w-4" />
-            Currently playing — trigger rotation to end
+            {fallbackActive
+              ? "Currently playing (fallback mode)"
+              : "Currently playing — trigger rotation to end"}
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
-
         {(rotation.status === "ready" || rotation.status === "scheduled" || rotation.status === "completed") && (
+          <div className="flex flex-wrap items-center gap-4">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setRestoreCursor((v) => !v)}
+                  disabled={!canManageContent}
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                  Resume where I left off:
+                  <span className={restoreCursor ? "text-green-500 font-medium" : "text-muted-foreground font-medium"}>
+                    {restoreCursor ? "Yes" : "No"}
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                When enabled, restores the live video position after this rotation finishes
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={handleToggleFallback}
+                  disabled={!canManageContent || !connected}
+                >
+                  {isFallback ? (
+                    <ShieldAlert className="h-3.5 w-3.5 text-orange-500" />
+                  ) : (
+                    <Shield className="h-3.5 w-3.5" />
+                  )}
+                  Use as fallback:
+                  <span className={isFallback ? "text-orange-500 font-medium" : "text-muted-foreground font-medium"}>
+                    {isFallback ? "Yes" : "No"}
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                When enabled, this rotation will automatically play if downloads start failing
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
+
+        {rotation.status !== "executing" && rotation.status !== "ready" && rotation.status !== "scheduled" && rotation.status !== "completed" && (
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 type="button"
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                onClick={() => setRestoreCursor((v) => !v)}
-                disabled={!canManageContent}
+                onClick={handleToggleFallback}
+                disabled={!canManageContent || !connected}
               >
-                <Undo2 className="h-3.5 w-3.5" />
-                Resume where I left off:
-                <span className={restoreCursor ? "text-green-500 font-medium" : "text-muted-foreground font-medium"}>
-                  {restoreCursor ? "Yes" : "No"}
+                {isFallback ? (
+                  <ShieldAlert className="h-3.5 w-3.5 text-orange-500" />
+                ) : (
+                  <Shield className="h-3.5 w-3.5" />
+                )}
+                Use as fallback:
+                <span className={isFallback ? "text-orange-500 font-medium" : "text-muted-foreground font-medium"}>
+                  {isFallback ? "Yes" : "No"}
                 </span>
               </button>
             </TooltipTrigger>
             <TooltipContent>
-              When enabled, restores the live video position after this rotation finishes
+              When enabled, this rotation will automatically play if downloads start failing
             </TooltipContent>
           </Tooltip>
         )}
+
+        <div className="flex flex-wrap items-center gap-2">{actions}</div>
 
         {showScheduler && (rotation.status === "ready" || rotation.status === "completed") && (
           <SchedulePicker
@@ -440,14 +614,15 @@ export default function PreparedRotationsPage() {
 
   const preparedRotations = state?.prepared_rotations ?? [];
   const anyDownloading = state?.any_downloading ?? false;
+  const fallbackActive = state?.fallback_active ?? false;
 
   // Create form state
   const [title, setTitle] = useState("");
   const [selectedPlaylists, setSelectedPlaylists] = useState<string[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
 
-  const enabledPlaylists = useMemo(
-    () => (state?.playlists ?? []).filter((p) => p.enabled),
+  const allPlaylists = useMemo(
+    () => state?.playlists ?? [],
     [state?.playlists]
   );
 
@@ -484,6 +659,47 @@ export default function PreparedRotationsPage() {
 
   return (
     <div className="space-y-6">
+      {fallbackActive && (
+        <div className="flex items-center justify-between rounded-lg border border-orange-500/40 bg-orange-500/10 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <ShieldAlert className="h-5 w-5 text-orange-500 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-orange-500">Fallback Mode Active</p>
+              <p className="text-xs text-muted-foreground">
+                Downloads are failing — currently using{" "}
+                {state?.fallback_tier === "prepared"
+                  ? "a fallback prepared rotation"
+                  : "pause screen"}{" "}
+                as a safety net. Retry every 5 minutes.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-orange-500 border-orange-500/30 hover:bg-orange-500/10 shrink-0"
+            onClick={() => sendCommand("deactivate_fallback")}
+            disabled={!connected || !canManageContent}
+          >
+            <X className="h-4 w-4 mr-1" />
+            Deactivate
+          </Button>
+        </div>
+      )}
+
+      {!fallbackActive && process.env.NODE_ENV === "development" && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-orange-500 border-orange-500/30"
+          onClick={() => sendCommand("force_fallback")}
+          disabled={!connected || !canManageContent}
+        >
+          <ShieldAlert className="h-4 w-4 mr-1" />
+          Force Fallback (Dev)
+        </Button>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">
@@ -552,22 +768,26 @@ export default function PreparedRotationsPage() {
                 Playlists ({selectedPlaylists.length} selected)
               </label>
               <div className="flex flex-wrap gap-2">
-                {enabledPlaylists.map((p) => {
+                {allPlaylists.map((p) => {
                   const selected = selectedPlaylists.includes(p.name);
                   return (
                     <Button
                       key={p.name}
                       variant={selected ? "default" : "outline"}
                       size="sm"
+                      className={!p.enabled ? "opacity-60 border-dashed" : undefined}
                       onClick={() => togglePlaylist(p.name)}
                     >
                       {p.name}
+                      {!p.enabled && (
+                        <span className="ml-1 text-[10px] text-muted-foreground">(off)</span>
+                      )}
                     </Button>
                   );
                 })}
-                {enabledPlaylists.length === 0 && (
+                {allPlaylists.length === 0 && (
                   <p className="text-xs text-muted-foreground">
-                    No enabled playlists available
+                    No playlists available
                   </p>
                 )}
               </div>
@@ -610,6 +830,7 @@ export default function PreparedRotationsPage() {
               connected={connected}
               canManageContent={canManageContent}
               sendCommand={sendCommand}
+              fallbackActive={fallbackActive}
             />
           ))}
         </div>

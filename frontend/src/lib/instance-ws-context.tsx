@@ -57,6 +57,7 @@ export interface PreparedRotation {
   video_count: number;
   created_at: string | null;
   scheduled_at: string | null;
+  is_fallback: boolean;
 }
 
 export interface EnvConfigEntry {
@@ -86,6 +87,8 @@ export interface InstanceState {
   any_downloading: boolean;
   executing_slug: string | null;
   env_config?: EnvConfig;
+  fallback_active: boolean;
+  fallback_tier: "prepared" | "pause" | null;
 }
 
 export interface LogEntry {
@@ -154,6 +157,7 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
         if (!mountedRef.current) return;
         console.log("[OSR-WS] Connected to", id);
         setConnected(true);
+        setLastAck(null); // clear stale ack from previous connection
         reconnectDelay.current = RECONNECT_BASE_MS; // reset backoff
         toast.dismiss("ws-connect");
       };

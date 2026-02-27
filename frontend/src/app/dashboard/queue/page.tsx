@@ -108,8 +108,8 @@ export default function QueuePage() {
   })();
   const queue = state?.queue ?? [];
   const downloadActive = state?.download_active ?? false;
-  const canSkip = state?.can_skip ?? true;
-  const canTriggerRotation = state?.can_trigger_rotation ?? true;
+  const canSkip = state?.can_skip ?? false;
+  const canTriggerRotation = state?.can_trigger_rotation ?? false;
 
   // ── Command cooldown: disable skip/rotate buttons until state reflects the change ──
   const [cooldownState, setCooldownState] = useState<{

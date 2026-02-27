@@ -50,23 +50,25 @@ function ConnectionBadge({
   tooltip?: string;
 }) {
   const content = (
-    <div className="flex items-center gap-1.5">
+    <span className="inline-flex items-center gap-1.5 cursor-help">
       {connected ? (
         <Wifi className="h-3.5 w-3.5 text-green-500" />
       ) : (
         <WifiOff className="h-3.5 w-3.5 text-red-500" />
       )}
       <span className="text-sm">{label}</span>
-    </div>
+    </span>
   );
 
-  if (!tooltip) return content;
+  if (!tooltip) return <div>{content}</div>;
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>{content}</TooltipTrigger>
-      <TooltipContent side="right">{tooltip}</TooltipContent>
-    </Tooltip>
+    <div>
+      <Tooltip>
+        <TooltipTrigger asChild>{content}</TooltipTrigger>
+        <TooltipContent side="right">{tooltip}</TooltipContent>
+      </Tooltip>
+    </div>
   );
 }
 
