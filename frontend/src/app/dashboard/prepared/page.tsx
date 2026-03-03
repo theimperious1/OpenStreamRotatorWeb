@@ -262,13 +262,13 @@ function PreparedRotationCard({
   }, [sendCommand, rotation.slug, isFallback, restoreCursor, confirmExecute]);
 
   const handleDelete = useCallback(() => {
-    if (isFallback && !confirmDelete) {
+    if (!confirmDelete) {
       setConfirmDelete(true);
       return;
     }
     sendCommand("delete_prepared_rotation", { slug: rotation.slug });
     setConfirmDelete(false);
-  }, [sendCommand, rotation.slug, isFallback, confirmDelete]);
+  }, [sendCommand, rotation.slug, confirmDelete]);
 
   const handleToggleFallback = useCallback(() => {
     const newValue = !isFallback;
