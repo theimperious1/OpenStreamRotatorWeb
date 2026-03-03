@@ -76,9 +76,11 @@ export default function SettingsPage() {
   const [draft, setDraft] = useState<OsrSettings>(() => remoteSettings ?? {});
   const [dirty, setDirty] = useState(false);
   const [envDraft, setEnvDraft] = useState<Record<string, string>>({});
+  const envDraftRef = useRef<Record<string, string>>({});
   const saveTimestampRef = useRef(0);
 
   const updateEnvDraft = useCallback((key: string, value: string) => {
+    envDraftRef.current[key] = value;
     setEnvDraft((prev) => ({ ...prev, [key]: value }));
   }, []);
 
@@ -145,12 +147,15 @@ export default function SettingsPage() {
         sendSetting(key, draft[key]);
       }
     }
-    // Send every changed env var
-    for (const [key, value] of Object.entries(envDraft)) {
+    // Send every changed env var — read from the ref so values committed
+    // synchronously by onBlur (before the click event) are always included,
+    // even if React hasn't re-rendered with the updated state yet.
+    for (const [key, value] of Object.entries(envDraftRef.current)) {
       sendCommand("update_env", { key, value });
     }
     saveTimestampRef.current = Date.now();
     setDirty(false);
+    envDraftRef.current = {};
     setEnvDraft({});
   }
 
@@ -304,26 +309,6 @@ export default function SettingsPage() {
                   enabled={!!draft.notify_video_transitions}
                   onToggle={() => handleToggle("notify_video_transitions")}
                   disabled={!canManageContent}
-                />
-              </SettingRow>
-              <Separator />
-              <SettingRow
-                label="Live Check Interval"
-                description="How often to check if the streamer is live (seconds, minimum 5)"
-              >
-                <Input
-                  type="number"
-                  value={draft.live_check_interval_seconds ?? 30}
-                  onChange={(e) =>
-                    updateDraft(
-                      "live_check_interval_seconds",
-                      Math.max(parseInt(e.target.value) || 5, 5)
-                    )
-                  }
-                  min={5}
-                  max={300}
-                  disabled={!canManageContent}
-                  className="w-20 text-sm text-center"
                 />
               </SettingRow>
             </CardContent>
@@ -896,10 +881,10 @@ function EnvRow({
             if (!editing) setEditing(true);
           }}
           onBlur={() => {
-            // Small delay so click on Save/Cancel registers first
-            setTimeout(() => {
-              if (!isSecret && editing) handleSave();
-            }, 150);
+            // Commit non-secret fields immediately on blur so the value
+            // is available synchronously in envDraftRef when the global
+            // Save button's click handler fires (blur always precedes click).
+            if (!isSecret && editing) handleSave();
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSave();
