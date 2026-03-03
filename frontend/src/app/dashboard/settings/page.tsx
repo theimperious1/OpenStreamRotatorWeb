@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -112,14 +112,18 @@ export default function SettingsPage() {
 
   // Sync remote settings into local draft when they arrive, but skip for
   // 3 seconds after a save to prevent stale server data from overwriting
-  // what we just sent.
-  useEffect(() => {
-    if (!remoteSettings) return;
-    const sinceSave = Date.now() - saveTimestampRef.current;
-    if (!dirty && sinceSave > 3000) {
-      setDraft(remoteSettings);
+  // what we just sent.  Uses render-time reconciliation to avoid
+  // calling setState inside useEffect.
+  const [prevRemoteSettings, setPrevRemoteSettings] = useState(remoteSettings);
+  if (remoteSettings !== prevRemoteSettings) {
+    setPrevRemoteSettings(remoteSettings);
+    if (remoteSettings) {
+      const sinceSave = Date.now() - saveTimestampRef.current;
+      if (!dirty && sinceSave > 3000) {
+        setDraft(remoteSettings);
+      }
     }
-  }, [remoteSettings]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   const updateDraft = useCallback(
     (key: keyof OsrSettings, value: OsrSettings[keyof OsrSettings]) => {

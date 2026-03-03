@@ -722,6 +722,8 @@ export default function PlaylistsPage() {
         kick_category: data.kick_category,
         priority: data.priority,
         enabled: true,
+        last_played: null,
+        play_count: 0,
       };
       setLocalPlaylists((prev) => [...prev, newPlaylist]);
       setShowAddForm(false);

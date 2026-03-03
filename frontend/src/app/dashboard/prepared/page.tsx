@@ -240,13 +240,15 @@ function PreparedRotationCard({
   const [confirmExecute, setConfirmExecute] = useState(false);
   const [optimisticFallback, setOptimisticFallback] = useState<boolean | null>(null);
 
-  // Reset optimistic state when server catches up
-  const isFallback = optimisticFallback ?? rotation.is_fallback;
-  useEffect(() => {
+  // Reset optimistic state when server catches up (render-time reconciliation)
+  const [prevServerFallback, setPrevServerFallback] = useState(rotation.is_fallback);
+  if (rotation.is_fallback !== prevServerFallback) {
+    setPrevServerFallback(rotation.is_fallback);
     if (optimisticFallback !== null && rotation.is_fallback === optimisticFallback) {
       setOptimisticFallback(null);
     }
-  }, [rotation.is_fallback, optimisticFallback]);
+  }
+  const isFallback = optimisticFallback ?? rotation.is_fallback;
 
   const handleExecute = useCallback(() => {
     if (isFallback && !confirmExecute) {
