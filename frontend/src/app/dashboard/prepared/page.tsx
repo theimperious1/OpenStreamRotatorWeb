@@ -226,6 +226,7 @@ function PreparedRotationCard({
   canManageContent,
   sendCommand,
   fallbackActive,
+  onOptimisticDelete,
 }: {
   rotation: PreparedRotation;
   anyDownloading: boolean;
@@ -233,6 +234,7 @@ function PreparedRotationCard({
   canManageContent: boolean;
   sendCommand: (action: string, payload?: Record<string, unknown>) => void;
   fallbackActive: boolean;
+  onOptimisticDelete: (slug: string) => void;
 }) {
   const [showScheduler, setShowScheduler] = useState(false);
   const [restoreCursor, setRestoreCursor] = useState(false);
@@ -269,8 +271,9 @@ function PreparedRotationCard({
       return;
     }
     sendCommand("delete_prepared_rotation", { slug: rotation.slug });
+    onOptimisticDelete(rotation.slug);
     setConfirmDelete(false);
-  }, [sendCommand, rotation.slug, confirmDelete]);
+  }, [sendCommand, rotation.slug, confirmDelete, onOptimisticDelete]);
 
   const handleToggleFallback = useCallback(() => {
     const newValue = !isFallback;
@@ -614,9 +617,32 @@ export default function PreparedRotationsPage() {
   const { canManageContent } = useMyRole();
   const { state, sendCommand, connected } = useInstanceWs();
 
-  const preparedRotations = state?.prepared_rotations ?? [];
+  const preparedRotations = useMemo(
+    () => state?.prepared_rotations ?? [],
+    [state?.prepared_rotations]
+  );
   const anyDownloading = state?.any_downloading ?? false;
   const fallbackActive = state?.fallback_active ?? false;
+
+  // Optimistic deletes — hide cards instantly before server confirms
+  const [deletedSlugs, setDeletedSlugs] = useState<Set<string>>(new Set());
+  const visibleRotations = useMemo(
+    () => preparedRotations.filter((r) => !deletedSlugs.has(r.slug)),
+    [preparedRotations, deletedSlugs]
+  );
+  // Clear optimistic state once the server removes the rotation from the list
+  const [prevSlugs, setPrevSlugs] = useState<string[]>([]);
+  const serverSlugs = useMemo(() => preparedRotations.map((r) => r.slug), [preparedRotations]);
+  if (serverSlugs.length !== prevSlugs.length || serverSlugs.some((s, i) => s !== prevSlugs[i])) {
+    setPrevSlugs(serverSlugs);
+    if (deletedSlugs.size > 0) {
+      const stillPresent = new Set(serverSlugs);
+      const remaining = new Set([...deletedSlugs].filter((s) => stillPresent.has(s)));
+      if (remaining.size !== deletedSlugs.size) {
+        setDeletedSlugs(remaining);
+      }
+    }
+  }
 
   // Create form state
   const [title, setTitle] = useState("");
@@ -649,7 +675,7 @@ export default function PreparedRotationsPage() {
     toast.success("Prepared rotation created");
   }, [canCreate, title, selectedPlaylists, sendCommand]);
 
-  const hasCompleted = preparedRotations.some((r) => r.status === "completed");
+  const hasCompleted = visibleRotations.some((r) => r.status === "completed");
 
   if (teamLoading) {
     return (
@@ -822,9 +848,9 @@ export default function PreparedRotationsPage() {
       )}
 
       {/* Prepared Rotations List */}
-      {preparedRotations.length > 0 ? (
+      {visibleRotations.length > 0 ? (
         <div className="space-y-4">
-          {preparedRotations.map((rotation) => (
+          {visibleRotations.map((rotation) => (
             <PreparedRotationCard
               key={rotation.slug}
               rotation={rotation}
@@ -833,6 +859,9 @@ export default function PreparedRotationsPage() {
               canManageContent={canManageContent}
               sendCommand={sendCommand}
               fallbackActive={fallbackActive}
+              onOptimisticDelete={(slug) =>
+                setDeletedSlugs((prev) => new Set([...prev, slug]))
+              }
             />
           ))}
         </div>

@@ -91,7 +91,9 @@ export default function SettingsPage() {
   const MAX_TITLE_LENGTH = 140;
   const titleWarning = useMemo(() => {
     const template = draft.stream_title_template ?? "";
-    if (!template.includes("{GAMES}")) return null;
+    // Normalize legacy {GAMES} → {PLAYLISTS}
+    const normalized = template.replace("{GAMES}", "{PLAYLISTS}");
+    if (!normalized.includes("{PLAYLISTS}")) return null;
     const playlists = state?.playlists ?? [];
     const enabled = playlists.filter((p) => p.enabled);
     if (enabled.length === 0) return null;
@@ -102,8 +104,8 @@ export default function SettingsPage() {
       .sort((a, b) => b.name.length - a.name.length)
       .slice(0, n)
       .map((p) => p.name.toUpperCase());
-    const gamesStr = longest.join(" | ");
-    const worstTitle = template.replace("{GAMES}", gamesStr);
+    const playlistsStr = longest.join(" | ");
+    const worstTitle = normalized.replace("{PLAYLISTS}", playlistsStr);
     if (worstTitle.length > MAX_TITLE_LENGTH) {
       return { length: worstTitle.length, preview: worstTitle };
     }
@@ -267,7 +269,7 @@ export default function SettingsPage() {
             <CardContent className="space-y-1">
               <SettingRow
                 label="Stream Title Template"
-                description="Use {GAMES} for playlist names. Applied each rotation."
+                description="Use {PLAYLISTS} for playlist names. Applied each rotation."
               >
                 <div className="space-y-1.5">
                   <Input

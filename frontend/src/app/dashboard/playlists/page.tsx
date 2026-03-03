@@ -695,7 +695,9 @@ export default function PlaylistsPage() {
   const MAX_TITLE_LENGTH = 140;
   const titleWarning = useMemo(() => {
     const template = settings?.stream_title_template ?? "";
-    if (!template.includes("{GAMES}")) return null;
+    // Normalize legacy {GAMES} → {PLAYLISTS}
+    const normalized = template.replace("{GAMES}", "{PLAYLISTS}");
+    if (!normalized.includes("{PLAYLISTS}")) return null;
     const enabled = localPlaylists.filter((p) => p.enabled);
     if (enabled.length === 0) return null;
     const maxPerRotation = Number(settings?.max_playlists_per_rotation) || enabled.length;
@@ -704,8 +706,8 @@ export default function PlaylistsPage() {
       .sort((a, b) => b.name.length - a.name.length)
       .slice(0, n)
       .map((p) => p.name.toUpperCase());
-    const gamesStr = longest.join(" | ");
-    const worstTitle = template.replace("{GAMES}", gamesStr);
+    const playlistsStr = longest.join(" | ");
+    const worstTitle = normalized.replace("{PLAYLISTS}", playlistsStr);
     if (worstTitle.length > MAX_TITLE_LENGTH) {
       return { length: worstTitle.length, preview: worstTitle };
     }
