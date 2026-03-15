@@ -19,6 +19,7 @@ import { toast } from "sonner";
 export interface PlaylistConfig {
   name: string;
   url: string;
+  display_name?: string;
   twitch_category: string;
   kick_category: string;
   enabled: boolean;
