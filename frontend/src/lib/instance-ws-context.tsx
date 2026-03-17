@@ -79,6 +79,7 @@ export interface InstanceState {
   playlists: PlaylistConfig[];
   settings: OsrSettings;
   queue: string[];
+  pending_videos: string[];
   connections: Connections;
   download_active: boolean;
   can_skip: boolean;

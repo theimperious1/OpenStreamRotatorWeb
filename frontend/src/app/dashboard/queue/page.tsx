@@ -107,6 +107,7 @@ export default function QueuePage() {
     return raw.twitch || raw.kick || null;
   })();
   const queue = state?.queue ?? [];
+  const pendingVideos = state?.pending_videos ?? [];
   const downloadActive = state?.download_active ?? false;
   const canSkip = state?.can_skip ?? false;
   const canTriggerRotation = state?.can_trigger_rotation ?? false;
@@ -301,79 +302,126 @@ export default function QueuePage() {
         </Card>
       )}
 
-      {/* Video Queue */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            Video Files in Rotation
-          </CardTitle>
-          <CardDescription>
-            {queue.length} video{queue.length !== 1 ? "s" : ""} in the current
-            rotation folder
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {queue.length > 0 ? (
-            <div className="space-y-1">
-              {queue.map((file, i) => {
-                const isCurrent = i === currentIndex;
-                // Strip the prefix number (e.g., "01_") for cleaner display
-                const displayName = file.replace(/^\d+_/, "");
-                return (
+      {/* Video Queue — current rotation + next rotation side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Current Rotation */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Video Files in Rotation
+            </CardTitle>
+            <CardDescription>
+              {queue.length} video{queue.length !== 1 ? "s" : ""} in the current
+              rotation folder
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {queue.length > 0 ? (
+              <div className="space-y-1">
+                {queue.map((file, i) => {
+                  const isCurrent = i === currentIndex;
+                  // Strip the prefix number (e.g., "01_") for cleaner display
+                  const displayName = file.replace(/^\d+_/, "");
+                  return (
+                    <div
+                      key={file}
+                      className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                        isCurrent
+                          ? "bg-primary/10 border border-primary/30"
+                          : "hover:bg-muted/50"
+                      }`}
+                    >
+                      <span className="text-xs text-muted-foreground w-6 text-right flex-shrink-0">
+                        {i + 1}
+                      </span>
+                      {isCurrent ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <PlayCircle className="h-4 w-4 text-primary flex-shrink-0 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>Currently playing</TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <FileVideo className="h-4 w-4 text-muted-foreground flex-shrink-0 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>Queued for playback</TooltipContent>
+                        </Tooltip>
+                      )}
+                      <span
+                        className={`truncate ${
+                          isCurrent ? "font-medium text-primary" : ""
+                        }`}
+                      >
+                        {displayName}
+                      </span>
+                      {isCurrent && (
+                        <Badge
+                          variant="outline"
+                          className="ml-auto text-[10px] text-primary border-primary/30 flex-shrink-0"
+                        >
+                          Playing
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-8 text-sm text-muted-foreground border border-dashed rounded-md">
+                {connected
+                  ? "No videos in rotation folder"
+                  : "Waiting for OSR instance connection..."}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Next Rotation */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">
+                  Video Files in Next Rotation
+                </CardTitle>
+                <CardDescription>
+                  {pendingVideos.length} video{pendingVideos.length !== 1 ? "s" : ""}{" "}
+                  {downloadActive ? "downloading..." : "in the pending folder"}
+                </CardDescription>
+              </div>
+              {downloadActive && (
+                <Loader2 className="h-4 w-4 animate-spin text-blue-500 flex-shrink-0" />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {pendingVideos.length > 0 ? (
+              <div className="space-y-1">
+                {pendingVideos.map((file, i) => (
                   <div
                     key={file}
-                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                      isCurrent
-                        ? "bg-primary/10 border border-primary/30"
-                        : "hover:bg-muted/50"
-                    }`}
+                    className="flex items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-muted/50"
                   >
                     <span className="text-xs text-muted-foreground w-6 text-right flex-shrink-0">
                       {i + 1}
                     </span>
-                    {isCurrent ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <PlayCircle className="h-4 w-4 text-primary flex-shrink-0 cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>Currently playing</TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <FileVideo className="h-4 w-4 text-muted-foreground flex-shrink-0 cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>Queued for playback</TooltipContent>
-                      </Tooltip>
-                    )}
-                    <span
-                      className={`truncate ${
-                        isCurrent ? "font-medium text-primary" : ""
-                      }`}
-                    >
-                      {displayName}
-                    </span>
-                    {isCurrent && (
-                      <Badge
-                        variant="outline"
-                        className="ml-auto text-[10px] text-primary border-primary/30 flex-shrink-0"
-                      >
-                        Playing
-                      </Badge>
-                    )}
+                    <FileVideo className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="truncate">{file}</span>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground border border-dashed rounded-md">
-              {connected
-                ? "No videos in rotation folder"
-                : "Waiting for OSR instance connection..."}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-8 text-sm text-muted-foreground border border-dashed rounded-md">
+                {connected
+                  ? "No videos queued for next rotation"
+                  : "Waiting for OSR instance connection..."}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
