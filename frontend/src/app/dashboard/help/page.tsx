@@ -250,7 +250,7 @@ const faqs: FaqItem[] = [
   {
     question: "How does live detection work?",
     answer:
-      "If you set TARGET_TWITCH_STREAMER or TARGET_KICK_STREAMER in your .env, OSR polls those channels. When the target goes live, OSR automatically switches to the pause scene in OBS. When they go offline, OSR resumes the 24/7 rotation.",
+      "If you set TARGET_TWITCH_STREAMER or TARGET_KICK_STREAMER in your .env, OSR monitors those channels. For Twitch, OSR uses EventSub (a real-time WebSocket push) as the primary signal — pause and unpause happen within seconds of a stream going live or offline. Kick is polled every 30 seconds. When both platforms are configured, both must agree the stream is offline before OSR unpauses. If EventSub Authoritative is enabled in Settings, EventSub's answer is trusted immediately and Kick polls are skipped — this avoids a delay of up to ~90 seconds where Kick still reports 'live' after the stream has ended. Enable it when your Twitch and Kick targets are the same streamer; leave it off if you stream on both platforms independently.",
   },
   {
     question: "Can multiple people manage the same stream?",

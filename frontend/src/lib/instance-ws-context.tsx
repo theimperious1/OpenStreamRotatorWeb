@@ -19,6 +19,7 @@ import { toast } from "sonner";
 export interface PlaylistConfig {
   name: string;
   url: string;
+  display_name?: string;
   twitch_category: string;
   kick_category: string;
   enabled: boolean;
@@ -30,6 +31,7 @@ export interface PlaylistConfig {
 export interface OsrSettings {
   stream_title_template?: string;
   ignore_streamer?: boolean;
+  eventsub_authoritative?: boolean;
   notify_video_transitions?: boolean;
   min_playlists_per_rotation?: number;
   max_playlists_per_rotation?: number;
@@ -78,6 +80,7 @@ export interface InstanceState {
   playlists: PlaylistConfig[];
   settings: OsrSettings;
   queue: string[];
+  pending_videos: string[];
   connections: Connections;
   download_active: boolean;
   can_skip: boolean;
@@ -280,6 +283,22 @@ export function InstanceWsProvider({ children }: { children: ReactNode }) {
       }
     };
   }, [instanceId, connect]);
+
+  // Force reconnect when tab becomes visible again (mobile browsers
+  // silently kill WebSockets when backgrounded without firing onclose)
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible" || !instanceId || !mountedRef.current) return;
+      const ws = wsRef.current;
+      if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+        console.log("[OSR-WS] Tab visible — WebSocket dead, reconnecting");
+        reconnectDelay.current = RECONNECT_BASE_MS;
+        connectRef.current(instanceId);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [instanceId]);
 
   const sendCommand = useCallback(
     (action: string, payload: Record<string, unknown> = {}, options?: { silent?: boolean }) => {

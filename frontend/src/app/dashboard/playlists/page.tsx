@@ -137,6 +137,7 @@ function CommandButton({
 interface PlaylistFormData {
   name: string;
   url: string;
+  display_name: string;
   twitch_category: string;
   kick_category: string;
   priority: number;
@@ -145,6 +146,7 @@ interface PlaylistFormData {
 const emptyForm: PlaylistFormData = {
   name: "",
   url: "",
+  display_name: "",
   twitch_category: "Just Chatting",
   kick_category: "",
   priority: 1,
@@ -197,6 +199,20 @@ function AddPlaylistForm({
           {nameIsUrl && (
             <p className="text-xs text-red-500 mt-1">Name should not be a URL</p>
           )}
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">
+            Display Name{" "}
+            <span className="text-[10px] opacity-60">(optional — used in stream title instead of Name)</span>
+          </label>
+          <Input
+            placeholder="Leave blank to use Name"
+            value={form.display_name}
+            onChange={(e) =>
+              setForm((p) => ({ ...p, display_name: e.target.value }))
+            }
+            className="text-sm"
+          />
         </div>
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">
@@ -295,12 +311,13 @@ function EditPlaylistForm({
 }: {
   playlist: PlaylistConfig;
   allNames: string[];
-  onSave: (updates: { name: string; url: string; twitch_category: string; kick_category: string; priority: number }) => void;
+  onSave: (updates: { name: string; url: string; display_name: string; twitch_category: string; kick_category: string; priority: number }) => void;
   onCancel: () => void;
 }) {
   const [form, setForm] = useState({
     name: playlist.name,
     url: playlist.url,
+    display_name: playlist.display_name ?? "",
     twitch_category: playlist.twitch_category,
     kick_category: playlist.kick_category,
     priority: playlist.priority,
@@ -352,6 +369,18 @@ function EditPlaylistForm({
           {nameIsUrl && (
             <p className="text-xs text-red-500 mt-1">Name should not be a URL</p>
           )}
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">
+            Display Name{" "}
+            <span className="text-[10px] opacity-60">(optional — used in stream title)</span>
+          </label>
+          <Input
+            value={form.display_name}
+            onChange={(e) => setForm((p) => ({ ...p, display_name: e.target.value }))}
+            placeholder="Leave blank to use Name"
+            className="text-sm"
+          />
         </div>
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">
@@ -465,6 +494,11 @@ function PlaylistCard({
           <CardTitle className="text-sm font-semibold">
             {playlist.name}
           </CardTitle>
+          {playlist.display_name && (
+            <span className="text-[11px] text-muted-foreground ml-1 truncate">
+              (title: {playlist.display_name})
+            </span>
+          )}
           <div className="flex items-center gap-1.5">
             {isActive && (
               <Badge
@@ -703,10 +737,12 @@ export default function PlaylistsPage() {
     const maxPerRotation = Number(settings?.max_playlists_per_rotation) || enabled.length;
     const n = Math.min(maxPerRotation, enabled.length);
     const longest = [...enabled]
-      .sort((a, b) => b.name.length - a.name.length)
+      .sort((a, b) => (b.display_name ?? b.name).length - (a.display_name ?? a.name).length)
       .slice(0, n)
-      .map((p) => p.name.toUpperCase());
-    const playlistsStr = longest.join(" | ");
+      .map((p) => (p.display_name ?? p.name).toUpperCase());
+    // Deduplicate display names (two playlists may share one)
+    const uniqueNames = [...new Set(longest)];
+    const playlistsStr = uniqueNames.join(" | ");
     const worstTitle = normalized.replace("{PLAYLISTS}", playlistsStr);
     if (worstTitle.length > MAX_TITLE_LENGTH) {
       return { length: worstTitle.length, preview: worstTitle };
@@ -720,6 +756,7 @@ export default function PlaylistsPage() {
       const newPlaylist: PlaylistConfig = {
         name: data.name,
         url: data.url,
+        ...(data.display_name ? { display_name: data.display_name } : {}),
         twitch_category: data.twitch_category,
         kick_category: data.kick_category,
         priority: data.priority,
@@ -734,10 +771,15 @@ export default function PlaylistsPage() {
   );
 
   const handleUpdate = useCallback(
-    (oldName: string, updates: { name: string; url: string; twitch_category: string; kick_category: string; priority: number }) => {
+    (oldName: string, updates: { name: string; url: string; display_name: string; twitch_category: string; kick_category: string; priority: number }) => {
       const newName = updates.name;
       setLocalPlaylists((prev) =>
-        prev.map((p) => (p.name === oldName ? { ...p, ...updates } : p))
+        prev.map((p) => {
+          if (p.name !== oldName) return p;
+          // Omit display_name from the result when it's empty
+          const { display_name, ...rest } = { ...p, ...updates };
+          return display_name ? { ...rest, display_name } : rest;
+        })
       );
       // Track the rename chain: if oldName was itself a rename, follow it back
       if (newName !== oldName) {
@@ -821,6 +863,7 @@ export default function PlaylistsPage() {
         sendCommand("add_playlist", {
           name: lp.name,
           url: lp.url,
+          display_name: lp.display_name ?? "",
           twitch_category: lp.twitch_category,
           kick_category: lp.kick_category,
           priority: lp.priority,
@@ -848,11 +891,13 @@ export default function PlaylistsPage() {
         lp.url !== sp.url ||
         lp.twitch_category !== sp.twitch_category ||
         lp.kick_category !== sp.kick_category ||
-        lp.priority !== sp.priority
+        lp.priority !== sp.priority ||
+        (lp.display_name ?? "") !== (sp.display_name ?? "")
       ) {
         sendCommand("update_playlist", {
           name: lp.name,
           url: lp.url,
+          display_name: lp.display_name ?? "",
           twitch_category: lp.twitch_category,
           kick_category: lp.kick_category,
           priority: lp.priority,
