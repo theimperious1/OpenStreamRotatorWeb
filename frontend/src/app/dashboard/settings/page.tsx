@@ -308,6 +308,17 @@ export default function SettingsPage() {
               </SettingRow>
               <Separator />
               <SettingRow
+                label="EventSub Authoritative"
+                description="Trust Twitch EventSub over Kick polls — skip Kick when EventSub has state"
+              >
+                <ToggleButton
+                  enabled={!!draft.eventsub_authoritative}
+                  onToggle={() => handleToggle("eventsub_authoritative")}
+                  disabled={!canManageContent}
+                />
+              </SettingRow>
+              <Separator />
+              <SettingRow
                 label="Notify Video Transitions"
                 description="Send Discord notification on every video change"
               >
